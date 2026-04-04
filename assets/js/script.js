@@ -523,7 +523,7 @@ function updateCount() {
 const CLAUSE_KW = [/\b(objeto|vigencia|vigência|prazo|valor|locaç|locac|serviç|servic|pagamento|rescis[ãa]o|obrigaç|multa|penalidade|garantia|vistoria|uso|sub(locaç|rogaç)|reajuste|índice|indice|foro|jurisdiç|compra|venda|prestação|confidencial|sigilo|propriedade|entrega|devolu[çc][aã]o|rescissão|cessão|cessao|arbitragem|inadimpl|mora|juros|vencimento|carência|renovação|prorrogaç|benfeitorias|conservaç|manutenç|notificaç|comunicaç|disposiç|gerais|finais)\b/i];
 const ORDINAL_CLAUSE   = /^(\d+[ºo°ª]?\s*[-–—.])\s+\S/;
 const CANONICAL_CLAUSE = /^(cl[aá]usula|artigo|art\.|§\s*\d)/i;
-const SECTION_MARKER   = /^(da[s]?\s+|do[s]?\s+|de\s+)[A-ZÁÉÍÓÚÂÊÎÔÛÃÕ]/;
+const SECTION_MARKER   = /^(da[s]?\s+|do[s]?\s+|de\s+)[A-ZÁÉÍÓÚÂÊÎÔÛÃÕA-Z]/i;
 
 function isSectionHeader(line) {
   const t = line.trim();
@@ -552,32 +552,50 @@ function isClauseTitle(line) {
 }
 function processText(rawText) {
   const blocks = [];
-  for (const line of rawText.split('\n')) {
-    const t = line.trim();
+  const lines = rawText.split('\n');
+  let i = 0;
+  while (i < lines.length) {
+    const t = lines[i].trim();
+
+    // Tabela markdown: linha com pipes
+    if (/^\|.+\|/.test(t)) {
+      const tableLines = [];
+      while (i < lines.length && /^\|/.test(lines[i].trim())) {
+        tableLines.push(lines[i].trim());
+        i++;
+      }
+      blocks.push({ type: 'table', lines: tableLines });
+      continue;
+    }
+
+    i++;
     if (!t) { blocks.push({ type: 'blank' }); continue; }
     if (/^[-•·*]\s/.test(t) || /^\d+\)\s/.test(t)) { blocks.push({ type: 'list', text: t.replace(/^[-•·*]\s+/, '').replace(/^\d+\)\s+/, '') }); continue; }
     if (isSectionHeader(t)) { blocks.push({ type: 'section', text: t }); continue; }
     if (isClauseTitle(t)) {
       // Padrão unificado: detecta separador após "Cláusula Nª"
       // Suporta: "Cláusula 1ª. Texto..." (ponto - Gemini)
-      //          "CLÁUSULA 1ª — Texto..." (travessão - GPT)
+      //          "CLÁUSULA 1ª — Título" (travessão curto - GPT)
       //          "CLÁUSULA 1ª — TÍTULO: Texto..." (colon)
       const clauseMatch = t.match(/^(cl[aá]usula\s+\d+[ºoª°]*)\s*(?:\.|-–—|[-–—])\s*\.?\s*(.*)/i);
       if (clauseMatch) {
         const clauseTitle = clauseMatch[1].trim();
         const body        = clauseMatch[2].trim();
-        if (body.length > 40) {
-          // Corpo longo → emite título + parágrafo separados
-          blocks.push({ type: 'clause', text: clauseTitle });
-          // Normaliza caixa: se vier todo em CAPS (GPT), converte para sentence case
-          const bodyNorm = (body === body.toUpperCase())
-            ? body.charAt(0) + body.slice(1).toLowerCase()
-            : body;
-          blocks.push({ type: 'para', text: bodyNorm });
-          continue;
-        } else if (body.length > 0) {
-          // Corpo curto → é o próprio título da cláusula
-          blocks.push({ type: 'clause', text: clauseTitle + (body ? ' — ' + body : '') });
+        if (body.length > 0) {
+          // Verifica se o body é só um subtítulo curto (≤6 palavras, sem pontuação final)
+          const wordCount = body.split(/\s+/).filter(Boolean).length;
+          const isSubtitle = wordCount <= 6 && !/[.!?]$/.test(body);
+          if (isSubtitle) {
+            // "Cláusula 1ª – Objeto" → título completo
+            blocks.push({ type: 'clause', text: clauseTitle + ' — ' + body });
+          } else {
+            // "Cláusula 1ª. O objeto deste contrato é..." → título + parágrafo
+            blocks.push({ type: 'clause', text: clauseTitle });
+            const bodyNorm = (body === body.toUpperCase())
+              ? body.charAt(0) + body.slice(1).toLowerCase()
+              : body;
+            blocks.push({ type: 'para', text: bodyNorm });
+          }
           continue;
         }
       }
@@ -605,6 +623,17 @@ function renderBlocks(blocks, numerarClausulas) {
         i++;
       }
       html += `<div class="doc-clause-block"><div class="doc-clause-title">${esc(titleDisplay)}</div>${clauseContent}</div>`;
+    } else if (b.type === 'table') {
+      // Renderiza tabela markdown como <table> HTML
+      const rows = b.lines.filter(l => !/^\|[-:\s|]+\|$/.test(l)); // remove separador
+      let tableHtml = '<table class="doc-table">';
+      rows.forEach((row, ri) => {
+        const cells = row.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+        const tag = ri === 0 ? 'th' : 'td';
+        tableHtml += '<tr>' + cells.map(c => `<${tag}>${esc(c)}</${tag}>`).join('') + '</tr>';
+      });
+      tableHtml += '</table>';
+      html += tableHtml; i++;
     } else if (b.type === 'section') {
       html += `<p class="doc-section-header">${esc(b.text)}</p>`; i++;
     } else if (b.type === 'para') {
