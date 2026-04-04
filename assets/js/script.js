@@ -636,8 +636,19 @@ function renderBlocks(blocks, numerarClausulas) {
 
     if (b.type === 'clause') {
       clausulaNum++;
-      const clean = b.text.replace(/^cl[aá]usula\s+\d+[ºoª°]*\s*[-–—]?\s*\.?\s*/i,'').replace(/^art(?:igo)?\s*\.\s*\d+[ºoª°]*\s*[-–—]?\s*\.?\s*/i,'').replace(/^\d+[ºoª°]*\s*[-–—.]\s*/i,'').replace(/^\.\s*/,'').trim();
-      const titleDisplay = numerarClausulas ? `CLÁUSULA ${clausulaNum}ª — ${clean.toUpperCase()}` : clean.toUpperCase();
+      const clean = b.text
+        .replace(/^cl[aá]usula\s+\d+[ºoª°]*\s*[-–—]?\s*\.?\s*/i,'')
+        .replace(/^art(?:igo)?\s*\.\s*\d+[ºoª°]*\s*[-–—]?\s*\.?\s*/i,'')
+        .replace(/^\d+[ºoª°]*\s*[-–—.]\s*/i,'')
+        .replace(/^\.\s*/,'')
+        .replace(/^[-–—]\s*/,'')
+        .replace(/\s*[-–—]\s*$/,'')
+        .trim();
+      const numMatch = b.text.match(/\d+/);
+      const numOrd   = numMatch ? numMatch[0] : String(clausulaNum);
+      const titleDisplay = numerarClausulas
+        ? `CLÁUSULA ${clausulaNum}ª${clean ? ' — ' + clean.toUpperCase() : ''}`
+        : (clean ? clean.toUpperCase() : `CLÁUSULA ${numOrd}ª`);
       let clauseContent = ''; i++;
       while (i < blocks.length && blocks[i].type !== 'clause') {
         const cb = blocks[i];
