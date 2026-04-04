@@ -587,6 +587,12 @@ select option { background: #1a2028; color: var(--text); }
   padding-left: 1.5cm; position: relative; margin-bottom: 4pt; line-height: 1.9;
 }
 .doc-list-item::before { content: '–'; position: absolute; left: 0.7cm; color: #555; }
+.doc-section-header {
+  font-size: 11pt; font-weight: 700; text-align: center;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  color: #111; margin: 10pt 0 4pt; line-height: 1.4;
+  text-indent: 0;
+}
 
 .sign-section { margin-top: 20mm; }
 .sign-location { text-align: right; margin-bottom: 12mm; font-size: 11pt; }
