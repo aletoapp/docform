@@ -593,6 +593,18 @@ select option { background: #1a2028; color: var(--text); }
   color: #111; margin: 10pt 0 4pt; line-height: 1.4;
   text-indent: 0;
 }
+.doc-table {
+  width: 100%; border-collapse: collapse;
+  margin: 8pt 0 10pt; font-size: 10pt; color: #111;
+}
+.doc-table th, .doc-table td {
+  border: 1px solid #999; padding: 4pt 6pt;
+  text-align: left; vertical-align: top;
+}
+.doc-table th {
+  background: #f0f0f0; font-weight: 700;
+  text-transform: uppercase; font-size: 9.5pt;
+}
 
 .sign-section { margin-top: 20mm; }
 .sign-location { text-align: right; margin-bottom: 12mm; font-size: 11pt; }
