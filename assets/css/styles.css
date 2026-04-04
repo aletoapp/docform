@@ -568,19 +568,20 @@ select option { background: #1a2028; color: var(--text); }
 .doc-subtitle { font-size: 10pt; color: #555; }
 
 .doc-body { text-align: justify; }
-.doc-clause-block { margin: 0 0 8pt; }
+.doc-clause-block { margin: 0 0 4pt; }
 .doc-clause-title {
   font-size: 11pt; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.04em;
-  color: #111; margin-top: 11pt; margin-bottom: 4pt; line-height: 1.4;
+  color: #111; margin-top: 8pt; margin-bottom: 2pt; line-height: 1.4;
 }
 .doc-clause-content {
-  text-indent: 1.25cm; text-align: justify; margin-bottom: 5pt; line-height: 1.9;
+  text-indent: 1.25cm; text-align: justify; margin-bottom: 3pt; line-height: 1.7;
   font-weight: 400; text-transform: none; font-size: 11pt;
 }
 .doc-para {
   text-indent: 1.25cm; text-align: justify;
-  margin-bottom: 5pt; line-height: 1.9;
+  margin-bottom: 3pt; line-height: 1.7;
+  font-weight: 400; text-transform: none; font-size: 11pt;
 }
 .doc-list-item {
   padding-left: 1.5cm; position: relative; margin-bottom: 4pt; line-height: 1.9;
