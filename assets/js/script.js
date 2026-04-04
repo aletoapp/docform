@@ -523,18 +523,8 @@ function updateCount() {
 const CLAUSE_KW = [/\b(objeto|vigencia|vigência|prazo|valor|locaç|locac|serviç|servic|pagamento|rescis[ãa]o|obrigaç|multa|penalidade|garantia|vistoria|uso|sub(locaç|rogaç)|reajuste|índice|indice|foro|jurisdiç|compra|venda|prestação|confidencial|sigilo|propriedade|entrega|devolu[çc][aã]o|rescissão|cessão|cessao|arbitragem|inadimpl|mora|juros|vencimento|carência|renovação|prorrogaç|benfeitorias|conservaç|manutenç|notificaç|comunicaç|disposiç|gerais|finais)\b/i];
 const ORDINAL_CLAUSE   = /^(\d+[ºo°ª]?\s*[-–—.])\s+\S/;
 const CANONICAL_CLAUSE = /^(cl[aá]usula|artigo|art\.|§\s*\d)/i;
-const SECTION_MARKER   = /^(da[s]?\s+|do[s]?\s+|de\s+)[A-ZÁÉÍÓÚÂÊÎÔÛÃÕA-Z]/i;
+const SECTION_MARKER   = /^(da[s]?\s+|do[s]?\s+|de\s+)[A-ZÁÉÍÓÚÂÊÎÔÛÃÕ]/;
 
-function isSectionHeader(line) {
-  const t = line.trim();
-  if (!t) return false;
-  if (CANONICAL_CLAUSE.test(t)) return false;
-  if (ORDINAL_CLAUSE.test(t)) return false;
-  const isAllCaps = t === t.toUpperCase() && /[A-ZÁÉÍÓÚÂÊÎÔÛÃÕ]/.test(t);
-  if (!isAllCaps) return false;
-  if (t.includes(',')) return false;
-  return SECTION_MARKER.test(t);
-}
 function isClauseTitle(line) {
   const t = line.trim();
   if (!t || t.length < 4) return false;
@@ -546,7 +536,7 @@ function isClauseTitle(line) {
   const words = t.split(/\s+/).filter(Boolean);
   if (words.length < 3) return false;
   if (CLAUSE_KW.some(rx => rx.test(t))) return true;
-  if (SECTION_MARKER.test(t)) return false; // seções tratadas separadamente
+  if (SECTION_MARKER.test(t) && words.length >= 3) return true;
   if (words.length >= 5 && !/\d/.test(t)) return true;
   return false;
 }
@@ -555,12 +545,13 @@ function processText(rawText) {
   const lines = rawText.split('\n');
   let i = 0;
   while (i < lines.length) {
-    const t = lines[i].trim();
+    const line = lines[i];
+    const t = line.trim();
 
-    // Tabela markdown: linha com pipes
+    // ── Detecção de tabela Markdown (|col|col|)
     if (/^\|.+\|/.test(t)) {
       const tableLines = [];
-      while (i < lines.length && /^\|/.test(lines[i].trim())) {
+      while (i < lines.length && /^\|.+\|/.test(lines[i].trim())) {
         tableLines.push(lines[i].trim());
         i++;
       }
@@ -568,41 +559,41 @@ function processText(rawText) {
       continue;
     }
 
-    i++;
-    if (!t) { blocks.push({ type: 'blank' }); continue; }
-    if (/^[-•·*]\s/.test(t) || /^\d+\)\s/.test(t)) { blocks.push({ type: 'list', text: t.replace(/^[-•·*]\s+/, '').replace(/^\d+\)\s+/, '') }); continue; }
-    if (isSectionHeader(t)) { blocks.push({ type: 'section', text: t }); continue; }
+    // ── Detecção de tabela tabulada (tabs ou 2+ espaços entre colunas)
+    if (/\t/.test(t) && t.split('\t').filter(Boolean).length >= 2) {
+      const tableLines = [];
+      while (i < lines.length && /\t/.test(lines[i]) && lines[i].split('\t').filter(Boolean).length >= 2) {
+        tableLines.push(lines[i]);
+        i++;
+      }
+      blocks.push({ type: 'table-tab', lines: tableLines });
+      continue;
+    }
+
+    if (!t) { blocks.push({ type: 'blank' }); i++; continue; }
+    if (/^[-•·*]\s/.test(t) || /^\d+\)\s/.test(t)) { blocks.push({ type: 'list', text: t.replace(/^[-•·*]\s+/, '').replace(/^\d+\)\s+/, '') }); i++; continue; }
     if (isClauseTitle(t)) {
-      // Padrão unificado: detecta separador após "Cláusula Nª"
-      // Suporta: "Cláusula 1ª. Texto..." (ponto - Gemini)
-      //          "CLÁUSULA 1ª — Título" (travessão curto - GPT)
-      //          "CLÁUSULA 1ª — TÍTULO: Texto..." (colon)
       const clauseMatch = t.match(/^(cl[aá]usula\s+\d+[ºoª°]*)\s*(?:\.|-–—|[-–—])\s*\.?\s*(.*)/i);
       if (clauseMatch) {
         const clauseTitle = clauseMatch[1].trim();
         const body        = clauseMatch[2].trim();
-        if (body.length > 0) {
-          // Verifica se o body é só um subtítulo curto (≤6 palavras, sem pontuação final)
-          const wordCount = body.split(/\s+/).filter(Boolean).length;
-          const isSubtitle = wordCount <= 6 && !/[.!?]$/.test(body);
-          if (isSubtitle) {
-            // "Cláusula 1ª – Objeto" → título completo
-            blocks.push({ type: 'clause', text: clauseTitle + ' — ' + body });
-          } else {
-            // "Cláusula 1ª. O objeto deste contrato é..." → título + parágrafo
-            blocks.push({ type: 'clause', text: clauseTitle });
-            const bodyNorm = (body === body.toUpperCase())
-              ? body.charAt(0) + body.slice(1).toLowerCase()
-              : body;
-            blocks.push({ type: 'para', text: bodyNorm });
-          }
-          continue;
+        if (body.length > 40) {
+          blocks.push({ type: 'clause', text: clauseTitle });
+          const bodyNorm = (body === body.toUpperCase())
+            ? body.charAt(0) + body.slice(1).toLowerCase()
+            : body;
+          blocks.push({ type: 'para', text: bodyNorm });
+          i++; continue;
+        } else if (body.length > 0) {
+          blocks.push({ type: 'clause', text: clauseTitle + (body ? ' — ' + body : '') });
+          i++; continue;
         }
       }
       blocks.push({ type: 'clause', text: t });
-      continue;
+      i++; continue;
     }
     blocks.push({ type: 'para', text: t });
+    i++;
   }
   return blocks;
 }
@@ -611,31 +602,52 @@ function renderBlocks(blocks, numerarClausulas) {
   while (i < blocks.length) {
     const b = blocks[i];
     if (b.type === 'blank') { i++; continue; }
+
+    // ── Tabela Markdown
+    if (b.type === 'table') {
+      const rows = b.lines.filter(l => !/^\|[-:\s|]+\|$/.test(l)); // remove linha separadora
+      if (rows.length > 0) {
+        const header = rows[0].split('|').filter(c => c.trim() !== '');
+        const body   = rows.slice(1);
+        html += `<div class="doc-table-wrap"><table class="doc-table">
+          <thead><tr>${header.map(h => `<th>${esc(h.trim())}</th>`).join('')}</tr></thead>
+          <tbody>${body.map(r => {
+            const cells = r.split('|').filter(c => c.trim() !== '');
+            return `<tr>${cells.map(c => `<td>${esc(c.trim())}</td>`).join('')}</tr>`;
+          }).join('')}</tbody>
+        </table></div>`;
+      }
+      i++; continue;
+    }
+
+    // ── Tabela tabulada
+    if (b.type === 'table-tab') {
+      const rows = b.lines.map(l => l.split('\t').map(c => c.trim()).filter(Boolean));
+      if (rows.length > 0) {
+        const header = rows[0];
+        const body   = rows.slice(1);
+        html += `<div class="doc-table-wrap"><table class="doc-table">
+          <thead><tr>${header.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead>
+          <tbody>${body.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody>
+        </table></div>`;
+      }
+      i++; continue;
+    }
+
     if (b.type === 'clause') {
       clausulaNum++;
       const clean = b.text.replace(/^cl[aá]usula\s+\d+[ºoª°]*\s*[-–—]?\s*\.?\s*/i,'').replace(/^art(?:igo)?\s*\.\s*\d+[ºoª°]*\s*[-–—]?\s*\.?\s*/i,'').replace(/^\d+[ºoª°]*\s*[-–—.]\s*/i,'').replace(/^\.\s*/,'').trim();
       const titleDisplay = numerarClausulas ? `CLÁUSULA ${clausulaNum}ª — ${clean.toUpperCase()}` : clean.toUpperCase();
       let clauseContent = ''; i++;
-      while (i < blocks.length && blocks[i].type !== 'clause' && blocks[i].type !== 'section') {
+      while (i < blocks.length && blocks[i].type !== 'clause') {
         const cb = blocks[i];
-        if (cb.type === 'para')  clauseContent += `<p class="doc-clause-content">${esc(cb.text)}</p>`;
-        if (cb.type === 'list')  clauseContent += `<div class="doc-list-item">${esc(cb.text)}</div>`;
+        if (cb.type === 'para')       clauseContent += `<p class="doc-clause-content">${esc(cb.text)}</p>`;
+        if (cb.type === 'list')       clauseContent += `<div class="doc-list-item">${esc(cb.text)}</div>`;
+        if (cb.type === 'table')      { /* renderiza inline */ const tmpBlocks = [cb]; clauseContent += renderBlocks(tmpBlocks, false); }
+        if (cb.type === 'table-tab')  { const tmpBlocks = [cb]; clauseContent += renderBlocks(tmpBlocks, false); }
         i++;
       }
       html += `<div class="doc-clause-block"><div class="doc-clause-title">${esc(titleDisplay)}</div>${clauseContent}</div>`;
-    } else if (b.type === 'table') {
-      // Renderiza tabela markdown como <table> HTML
-      const rows = b.lines.filter(l => !/^\|[-:\s|]+\|$/.test(l)); // remove separador
-      let tableHtml = '<table class="doc-table">';
-      rows.forEach((row, ri) => {
-        const cells = row.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
-        const tag = ri === 0 ? 'th' : 'td';
-        tableHtml += '<tr>' + cells.map(c => `<${tag}>${esc(c)}</${tag}>`).join('') + '</tr>';
-      });
-      tableHtml += '</table>';
-      html += tableHtml; i++;
-    } else if (b.type === 'section') {
-      html += `<p class="doc-section-header">${esc(b.text)}</p>`; i++;
     } else if (b.type === 'para') {
       html += `<p class="doc-para">${esc(b.text)}</p>`; i++;
     } else if (b.type === 'list') {
