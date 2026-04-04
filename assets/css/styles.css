@@ -545,7 +545,7 @@ select option { background: #1a2028; color: var(--text); }
   font-family: 'Times New Roman', Times, serif;
   font-size: 12pt;
   color: #111;
-  line-height: 1.5;
+  line-height: 1.9;
 }
 .doc-logo-row {
   display: flex; align-items: center;
@@ -568,43 +568,55 @@ select option { background: #1a2028; color: var(--text); }
 .doc-subtitle { font-size: 10pt; color: #555; }
 
 .doc-body { text-align: justify; }
-.doc-clause-block { margin: 0 0 4pt; }
+.doc-clause-block { margin: 0 0 8pt; }
 .doc-clause-title {
   font-size: 11pt; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.04em;
-  color: #111; margin-top: 8pt; margin-bottom: 2pt; line-height: 1.4;
+  color: #111; margin-top: 14pt; margin-bottom: 8pt; line-height: 1.4;
+  display: block;
 }
 .doc-clause-content {
-  text-indent: 1.25cm; text-align: justify; margin-bottom: 3pt; line-height: 1.7;
+  text-indent: 1.25cm; text-align: justify; margin-bottom: 5pt; line-height: 1.9;
   font-weight: 400; text-transform: none; font-size: 11pt;
 }
 .doc-para {
   text-indent: 1.25cm; text-align: justify;
-  margin-bottom: 3pt; line-height: 1.7;
-  font-weight: 400; text-transform: none; font-size: 11pt;
+  margin-bottom: 5pt; line-height: 1.9;
 }
 .doc-list-item {
   padding-left: 1.5cm; position: relative; margin-bottom: 4pt; line-height: 1.9;
 }
 .doc-list-item::before { content: '–'; position: absolute; left: 0.7cm; color: #555; }
-.doc-section-header {
-  font-size: 11pt; font-weight: 700; text-align: center;
-  text-transform: uppercase; letter-spacing: 0.05em;
-  color: #111; margin: 10pt 0 4pt; line-height: 1.4;
-  text-indent: 0;
+
+/* ── Tabelas no documento ── */
+.doc-table-wrap {
+  margin: 8pt 0 10pt;
+  overflow-x: auto;
 }
 .doc-table {
-  width: 100%; border-collapse: collapse;
-  margin: 8pt 0 10pt; font-size: 10pt; color: #111;
-}
-.doc-table th, .doc-table td {
-  border: 1px solid #999; padding: 4pt 6pt;
-  text-align: left; vertical-align: top;
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 10.5pt;
+  color: #111;
 }
 .doc-table th {
-  background: #f0f0f0; font-weight: 700;
-  text-transform: uppercase; font-size: 9.5pt;
+  background: #f0ece4;
+  font-weight: 700;
+  text-align: left;
+  padding: 5pt 8pt;
+  border: 1px solid #888;
+  text-transform: uppercase;
+  font-size: 9.5pt;
+  letter-spacing: 0.03em;
 }
+.doc-table td {
+  padding: 4pt 8pt;
+  border: 1px solid #bbb;
+  vertical-align: top;
+  line-height: 1.6;
+}
+.doc-table tr:nth-child(even) td { background: #faf9f6; }
 
 .sign-section { margin-top: 20mm; }
 .sign-location { text-align: right; margin-bottom: 12mm; font-size: 11pt; }
