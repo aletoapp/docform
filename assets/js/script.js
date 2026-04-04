@@ -525,6 +525,16 @@ const ORDINAL_CLAUSE   = /^(\d+[ºo°ª]?\s*[-–—.])\s+\S/;
 const CANONICAL_CLAUSE = /^(cl[aá]usula|artigo|art\.|§\s*\d)/i;
 const SECTION_MARKER   = /^(da[s]?\s+|do[s]?\s+|de\s+)[A-ZÁÉÍÓÚÂÊÎÔÛÃÕ]/;
 
+function isSectionHeader(line) {
+  const t = line.trim();
+  if (!t) return false;
+  if (CANONICAL_CLAUSE.test(t)) return false;
+  if (ORDINAL_CLAUSE.test(t)) return false;
+  const isAllCaps = t === t.toUpperCase() && /[A-ZÁÉÍÓÚÂÊÎÔÛÃÕ]/.test(t);
+  if (!isAllCaps) return false;
+  if (t.includes(',')) return false;
+  return SECTION_MARKER.test(t);
+}
 function isClauseTitle(line) {
   const t = line.trim();
   if (!t || t.length < 4) return false;
@@ -536,7 +546,7 @@ function isClauseTitle(line) {
   const words = t.split(/\s+/).filter(Boolean);
   if (words.length < 3) return false;
   if (CLAUSE_KW.some(rx => rx.test(t))) return true;
-  if (SECTION_MARKER.test(t) && words.length >= 3) return true;
+  if (SECTION_MARKER.test(t)) return false; // seções tratadas separadamente
   if (words.length >= 5 && !/\d/.test(t)) return true;
   return false;
 }
@@ -546,6 +556,7 @@ function processText(rawText) {
     const t = line.trim();
     if (!t) { blocks.push({ type: 'blank' }); continue; }
     if (/^[-•·*]\s/.test(t) || /^\d+\)\s/.test(t)) { blocks.push({ type: 'list', text: t.replace(/^[-•·*]\s+/, '').replace(/^\d+\)\s+/, '') }); continue; }
+    if (isSectionHeader(t)) { blocks.push({ type: 'section', text: t }); continue; }
     if (isClauseTitle(t)) {
       // Padrão unificado: detecta separador após "Cláusula Nª"
       // Suporta: "Cláusula 1ª. Texto..." (ponto - Gemini)
@@ -587,13 +598,15 @@ function renderBlocks(blocks, numerarClausulas) {
       const clean = b.text.replace(/^cl[aá]usula\s+\d+[ºoª°]*\s*[-–—]?\s*\.?\s*/i,'').replace(/^art(?:igo)?\s*\.\s*\d+[ºoª°]*\s*[-–—]?\s*\.?\s*/i,'').replace(/^\d+[ºoª°]*\s*[-–—.]\s*/i,'').replace(/^\.\s*/,'').trim();
       const titleDisplay = numerarClausulas ? `CLÁUSULA ${clausulaNum}ª — ${clean.toUpperCase()}` : clean.toUpperCase();
       let clauseContent = ''; i++;
-      while (i < blocks.length && blocks[i].type !== 'clause') {
+      while (i < blocks.length && blocks[i].type !== 'clause' && blocks[i].type !== 'section') {
         const cb = blocks[i];
         if (cb.type === 'para')  clauseContent += `<p class="doc-clause-content">${esc(cb.text)}</p>`;
         if (cb.type === 'list')  clauseContent += `<div class="doc-list-item">${esc(cb.text)}</div>`;
         i++;
       }
       html += `<div class="doc-clause-block"><div class="doc-clause-title">${esc(titleDisplay)}</div>${clauseContent}</div>`;
+    } else if (b.type === 'section') {
+      html += `<p class="doc-section-header">${esc(b.text)}</p>`; i++;
     } else if (b.type === 'para') {
       html += `<p class="doc-para">${esc(b.text)}</p>`; i++;
     } else if (b.type === 'list') {
