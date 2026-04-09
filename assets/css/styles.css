@@ -986,3 +986,32 @@ select option { background: #1a2028; color: var(--text); }
 
 /* Quando offline, empurra o layout para baixo */
 body.is-offline .layout { padding-top: calc(var(--hdr) + 30px); }
+
+/* ══ EDIT MODE — contenteditable preview ══ */
+[contenteditable="true"] {
+  outline: none;
+  cursor: text;
+}
+[contenteditable="true"]:focus {
+  outline: none;
+}
+/* Editable doc-contract gets a subtle highlight ring */
+.doc-contract[contenteditable="true"] {
+  box-shadow: 0 0 0 2px rgba(201,168,76,0.25);
+  border-radius: 2px;
+  transition: box-shadow 0.2s ease;
+}
+/* Edit mode banner on toolbar */
+.preview-toolbar.editing .pt-title::after {
+  content: ' — modo edição';
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+}
+/* Editable paragraphs show hover highlight */
+.doc-contract[contenteditable="true"] p:hover,
+.doc-contract[contenteditable="true"] .clause-title:hover {
+  background: rgba(201,168,76,0.06);
+  border-radius: 3px;
+}
