@@ -752,7 +752,7 @@ function buildPaginatedHtml(bodyHtml, opts) {
       <div class="doc-contract">
         ${logoHtml}
         ${docHeader}
-        <div class="doc-body">${bodyHtml}</div>
+        <div class="doc-body" id="doc-body-editable">${bodyHtml}</div>
         ${signHtml}
       </div>
     </div>
@@ -796,6 +796,55 @@ function formatarDocumento() {
   document.getElementById('preview-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
   showToast('Documento formatado!', 'ok');
   setTimeout(() => scaleDocPreview('preview-pages-wrap'), 80);
+}
+
+/* ════════════════════════════════════════════
+   EDIT PREVIEW — contenteditable toggle
+════════════════════════════════════════════ */
+let _previewEditMode = false;
+
+function toggleEditPreview() {
+  const body = document.getElementById('doc-body-editable');
+  const btn  = document.getElementById('btn-edit-toggle');
+  if (!body) { showToast('Formate o documento primeiro.', 'err'); return; }
+
+  _previewEditMode = !_previewEditMode;
+
+  if (_previewEditMode) {
+    // Enable editing on the whole doc-contract area
+    const contract = body.closest('.doc-contract') || body;
+    contract.setAttribute('contenteditable', 'true');
+    contract.setAttribute('spellcheck', 'true');
+    contract.style.outline = 'none';
+    contract.style.cursor  = 'text';
+    // Mark as edited on any input
+    contract.addEventListener('input', () => { body.dataset.edited = 'true'; }, { once: false, passive: true });
+    // Visual cue: subtle golden left border on editable body
+    body.style.borderLeft  = '2px solid var(--ink)';
+    body.style.paddingLeft = '8px';
+    btn.innerHTML = '✅ Concluir';
+    btn.classList.add('btn-primary');
+    btn.classList.remove('btn-secondary');
+    document.querySelector('#preview-section .preview-toolbar')?.classList.add('editing');
+    showToast('Modo edição ativo — clique no texto para editar.', 'ok');
+    // Focus the body for immediate editing
+    setTimeout(() => body.focus(), 50);
+  } else {
+    const contract = body.closest('.doc-contract') || body;
+    contract.removeAttribute('contenteditable');
+    contract.style.cursor = '';
+    body.style.borderLeft  = '';
+    body.style.paddingLeft = '';
+    btn.innerHTML = '✏️ Editar';
+    btn.classList.remove('btn-primary');
+    btn.classList.add('btn-secondary');
+    document.querySelector('#preview-section .preview-toolbar')?.classList.remove('editing');
+    if (body.dataset.edited === 'true') {
+      showToast('Edição salva — PDF e DOCX refletirão o conteúdo editado.', 'ok');
+    } else {
+      showToast('Modo edição desativado.', 'ok');
+    }
+  }
 }
 
 /* ════════════════════════════════════════════
@@ -843,8 +892,8 @@ async function exportContratoPDF() {
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pW = 210, pH = 297;
-  // Margens jurídicas padrão OAB/Tribunais: Esq 3cm, Dir/Sup 2cm, Inf 2.5cm
-  const mL = 30, mR = 20, mT = 20, mB = 25;
+  // Margens: Esq 3cm (encadernação), Sup 2cm, Dir 2,5cm, Inf 2,5cm — praxe contratual
+  const mL = 30, mR = 25, mT = 20, mB = 25; // mR: 25mm — praxe contratual (ABNT inferior = 2,5cm)
   const cW = pW - mL - mR; // 160mm content width
 
   const titulo  = document.getElementById('doc-titulo').value || PRESET_TITLES[currentPreset] || 'CONTRATO';
@@ -854,8 +903,13 @@ async function exportContratoPDF() {
   const dataStr = dataRaw ? formatDate(dataRaw) : hojeFormatado();
   const sign1   = document.getElementById('sign1-name').value.trim() || 'PARTE CONTRATANTE';
   const sign2   = document.getElementById('sign2-name').value.trim() || 'PARTE CONTRATADA';
-  const texto   = document.getElementById('input-text').value.trim();
-  const blocks  = processText(texto);
+
+  // Use edited preview content if available, otherwise fallback to original input
+  const _editedBody = document.getElementById('doc-body-editable');
+  const textoBase   = (_editedBody && _editedBody.dataset.edited === 'true')
+    ? (_editedBody.innerText || _editedBody.textContent || '').trim()
+    : document.getElementById('input-text').value.trim();
+  const blocks  = processText(textoBase);
 
   let pageNum = 1;
   let y = mT;
@@ -1010,7 +1064,7 @@ async function exportContratoPDF() {
       pdf.setFont('times', 'normal');
       pdf.setFontSize(11);
       pdf.setTextColor(30,30,30);
-      pdf.text(`${cidade}, ${dataStr}.`, pW - mR, y, { align: 'right' });
+      pdf.text(`${cidade}, ${dataStr}.`, pW/2, y, { align: 'center' });
       y += 14;
     }
     const colW = (cW - 20) / 2;
@@ -1030,7 +1084,7 @@ async function exportContratoPDF() {
     s1Lines.forEach((l,li) => { pdf.text(l, centerCol1, y + li*5, { align:'center' }); });
     s2Lines.forEach((l,li) => { pdf.text(l, centerCol2, y + li*5, { align:'center' }); });
     y += Math.max(s1Lines.length, s2Lines.length) * 5 + 2;
-    pdf.setFont('times', 'normal');
+    pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(9);
     pdf.setTextColor(100,100,100);
     pdf.text('CPF: ___.___.___-__', centerCol1, y, { align:'center' });
@@ -1278,7 +1332,7 @@ async function exportEmailPDF() {
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pW = 210, pH = 297;
-  const mL = 30, mR = 20, mT = 20, mB = 25;
+  const mL = 30, mR = 25, mT = 20, mB = 25; // mR: 25mm — praxe contratual (ABNT inferior = 2,5cm)
   const cW = pW - mL - mR;
   let y = mT;
 
