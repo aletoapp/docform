@@ -142,6 +142,101 @@
 .wa-doc-pill-type.pdf  { background: rgba(239,68,68,.12);  color: #f87171; }
 .wa-doc-pill-type.docx { background: rgba(59,130,246,.12); color: #60a5fa; }
 
+/* ── Format selector (PDF / DOCX pills) ─────────────────────── */
+.wa-fmt-selector {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.wa-fmt-label {
+  font-size: .68rem;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.wa-fmt-pills {
+  display: flex;
+  gap: 6px;
+}
+.wa-fmt-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 13px;
+  border-radius: 20px;
+  font-size: .75rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: .04em;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  transition: background .15s, border-color .15s, color .15s, transform .1s, box-shadow .15s;
+  user-select: none;
+}
+/* PDF — vermelho apagado (inativo) */
+.wa-fmt-pill.pdf {
+  background: rgba(239,68,68,.07);
+  border-color: rgba(239,68,68,.2);
+  color: rgba(248,113,113,.55);
+}
+/* PDF — aceso (ativo) */
+.wa-fmt-pill.pdf.active {
+  background: rgba(239,68,68,.15);
+  border-color: #f87171;
+  color: #f87171;
+  box-shadow: 0 0 0 3px rgba(248,113,113,.12);
+  transform: scale(1.04);
+}
+/* DOCX — azul apagado (inativo) */
+.wa-fmt-pill.docx {
+  background: rgba(59,130,246,.07);
+  border-color: rgba(59,130,246,.2);
+  color: rgba(96,165,250,.55);
+}
+/* DOCX — aceso (ativo) */
+.wa-fmt-pill.docx.active {
+  background: rgba(59,130,246,.15);
+  border-color: #60a5fa;
+  color: #60a5fa;
+  box-shadow: 0 0 0 3px rgba(96,165,250,.12);
+  transform: scale(1.04);
+}
+.wa-fmt-pill:hover:not(.active) { transform: scale(1.02); opacity: .85; }
+.wa-fmt-pill-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background .15s;
+}
+.wa-fmt-pill.pdf  .wa-fmt-pill-dot { background: rgba(248,113,113,.4); }
+.wa-fmt-pill.pdf.active  .wa-fmt-pill-dot { background: #f87171; }
+.wa-fmt-pill.docx .wa-fmt-pill-dot { background: rgba(96,165,250,.4); }
+.wa-fmt-pill.docx.active .wa-fmt-pill-dot { background: #60a5fa; }
+
+/* Atualiza o badge no pill de nome conforme seleção */
+.wa-doc-pill-type.pdf  { background: rgba(239,68,68,.12);  color: #f87171; }
+.wa-doc-pill-type.docx { background: rgba(59,130,246,.12); color: #60a5fa; }
+
+/* Gov.br badge — nota informativa no footer */
+.wa-govbr-note {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  background: rgba(0,102,204,.07);
+  border: 1px solid rgba(0,102,204,.2);
+  border-radius: 8px;
+  font-size: .7rem;
+  color: #5fa8f5;
+  font-family: var(--font-mono);
+  line-height: 1.4;
+}
+.wa-govbr-note-icon { font-size: .9rem; flex-shrink: 0; }
+
 /* ── Label ───────────────────────────────────────────────────── */
 .wa-label {
   display: block;
