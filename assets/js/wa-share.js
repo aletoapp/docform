@@ -66,11 +66,45 @@ const _WA = {
   country    : WA_COUNTRIES[0],   // BR pré-selecionado
   docType    : null,              // 'contrato' | 'cv' | 'email'
   docTitle   : '',
+  fmt        : 'pdf',            // 'pdf' | 'docx' — padrão PDF (Gov.br)
   ddOpen     : false,
   valid      : false,
 };
 
-/* ── 3. ICON SVG ─────────────────────────────────────────────── */
+/* ── 3. FORMAT SELECTOR ──────────────────────────────────────── */
+/**
+ * Alterna entre PDF e DOCX.
+ * PDF é sempre prioritário para compatibilidade com Gov.br / ICP-Brasil.
+ */
+function waSelectFormat(fmt) {
+  _WA.fmt = fmt;
+
+  /* Pills — acende o selecionado, apaga o outro */
+  const pdfPill  = document.getElementById('wa-fmt-pdf');
+  const docxPill = document.getElementById('wa-fmt-docx');
+  if (!pdfPill || !docxPill) return;
+
+  pdfPill.classList.toggle('active', fmt === 'pdf');
+  pdfPill.setAttribute('aria-pressed', fmt === 'pdf');
+  docxPill.classList.toggle('active', fmt === 'docx');
+  docxPill.setAttribute('aria-pressed', fmt === 'docx');
+
+  /* Badge no pill de nome do arquivo */
+  const typeEl = document.getElementById('wa-pill-type');
+  if (typeEl) {
+    typeEl.textContent = fmt.toUpperCase();
+    typeEl.className   = `wa-doc-pill-type ${fmt}`;
+  }
+
+  /* Nota Gov.br — visível apenas quando PDF selecionado */
+  const govNote = document.getElementById('wa-govbr-note');
+  if (govNote) govNote.style.display = fmt === 'pdf' ? '' : 'none';
+
+  /* Atualiza hint do método (DOCX não suporta Web Share nativo no iOS) */
+  _waUpdateMethodHint();
+}
+
+/* ── 4. ICON SVG ─────────────────────────────────────────────── */
 const WA_SVG = `<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>`;
 
 /* ── 4. BUILD MODAL HTML (injetado uma vez no DOM) ───────────── */
@@ -97,11 +131,28 @@ function _waInjectModal() {
     <!-- Body (form) -->
     <div class="wa-modal-body" id="wa-modal-body">
 
-      <!-- Doc pill -->
+      <!-- Doc pill + format selector -->
       <div class="wa-doc-pill">
         <span class="wa-doc-pill-icon" id="wa-pill-icon">📄</span>
         <span class="wa-doc-pill-name" id="wa-pill-name">—</span>
         <span class="wa-doc-pill-type pdf" id="wa-pill-type">PDF</span>
+      </div>
+
+      <!-- Format selector -->
+      <div class="wa-fmt-selector">
+        <span class="wa-fmt-label">Formato</span>
+        <div class="wa-fmt-pills">
+          <button class="wa-fmt-pill pdf active" id="wa-fmt-pdf"
+                  onclick="waSelectFormat('pdf')" type="button"
+                  aria-pressed="true" title="Enviar como PDF — recomendado para assinatura Gov.br">
+            <span class="wa-fmt-pill-dot"></span>PDF
+          </button>
+          <button class="wa-fmt-pill docx" id="wa-fmt-docx"
+                  onclick="waSelectFormat('docx')" type="button"
+                  aria-pressed="false" title="Enviar como DOCX — editável no Word">
+            <span class="wa-fmt-pill-dot"></span>DOCX
+          </button>
+        </div>
       </div>
 
       <!-- Phone -->
@@ -160,6 +211,10 @@ function _waInjectModal() {
       <div class="wa-method-hint" id="wa-method-hint">
         <span class="wa-method-dot" id="wa-method-dot"></span>
         <span id="wa-method-text">Detectando método de envio...</span>
+      </div>
+      <div class="wa-govbr-note" id="wa-govbr-note">
+        <span class="wa-govbr-note-icon">🔐</span>
+        <span>PDF obrigatório para assinatura digital <strong>Gov.br / ICP-Brasil</strong></span>
       </div>
     </div>
 
@@ -352,9 +407,14 @@ function _waUpdateMethodHint() {
   const text = document.getElementById('wa-method-text');
   if (!dot || !text) return;
 
-  if (navigator.share) {
+  const isPdf = _WA.fmt === 'pdf';
+
+  if (isPdf && navigator.share) {
     dot.classList.add('active');
-    text.textContent = 'Web Share API disponível — compartilhamento nativo.';
+    text.textContent = 'Web Share API disponível — compartilhamento nativo com arquivo.';
+  } else if (!isPdf) {
+    dot.classList.remove('active');
+    text.textContent = 'DOCX: abrirá o WhatsApp com mensagem (sem anexo automático).';
   } else {
     dot.classList.remove('active');
     text.textContent = 'Fallback: abrirá o WhatsApp Web / app instalado.';
@@ -415,6 +475,9 @@ function openWaModal(tipo) {
   }
 
   /* Reset estado */
+  _WA.fmt = 'pdf';
+  waSelectFormat('pdf');
+
   const inp = document.getElementById('wa-phone');
   if (inp) {
     inp.value = '';
@@ -455,58 +518,97 @@ function waModalClose() {
 async function waDoSend() {
   if (!_WA.valid) return;
 
-  const btn    = document.getElementById('wa-send-btn');
-  const rawDig = document.getElementById('wa-phone').value.replace(/\D/g, '');
-  const dial   = _WA.country.d.replace('+', '');
-  const full   = dial + rawDig;
-  const msg    = document.getElementById('wa-msg').value.trim() ||
-                 `Olá! Segue o documento gerado pelo DocForm.`;
-  const fileName = (_WA.docTitle || 'documento').replace(/[^a-zA-Z0-9À-ÿ \-_]/g, '') + '.pdf';
+  const btn      = document.getElementById('wa-send-btn');
+  const rawDig   = document.getElementById('wa-phone').value.replace(/\D/g, '');
+  const dial     = _WA.country.d.replace('+', '');
+  const full     = dial + rawDig;
+  const msg      = document.getElementById('wa-msg').value.trim() ||
+                   `Olá! Segue o documento gerado pelo DocForm.`;
+  const isPdf    = _WA.fmt === 'pdf';
+  const ext      = isPdf ? 'pdf' : 'docx';
+  const mimeType = isPdf
+    ? 'application/pdf'
+    : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  const fileName = (_WA.docTitle || 'documento')
+    .replace(/[^a-zA-Z0-9À-ÿ \-_]/g, '') + `.${ext}`;
 
   /* Feedback visual — loading */
   btn.classList.add('loading');
   btn.disabled = true;
 
   try {
-    /* Tenta gerar o PDF blob a partir do contexto do DocForm */
-    let pdfBlob = null;
-    try {
-      pdfBlob = await _waGetPdfBlob(_WA.docType);
-    } catch (e) {
-      console.warn('[DocForm WA] Não foi possível gerar blob PDF:', e);
-    }
+    let fileBlob = null;
 
-    /* Tenta Web Share API com arquivo */
-    if (pdfBlob && navigator.canShare) {
-      const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-      if (navigator.canShare({ files: [file] })) {
-        try {
-          await navigator.share({
-            files  : [file],
-            title  : _WA.docTitle || 'Documento DocForm',
-            text   : msg,
-          });
-          _waShowSuccess('Documento compartilhado com sucesso via share nativo.');
-          return;
-        } catch (e) {
-          if (e.name === 'AbortError') {
-            btn.classList.remove('loading');
-            btn.disabled = false;
-            return; /* Usuário cancelou — não avança */
+    if (isPdf) {
+      /* ── PDF: tenta capturar blob via jsPDF ── */
+      try { fileBlob = await _waGetPdfBlob(_WA.docType); }
+      catch (e) { console.warn('[DocForm WA] Blob PDF falhou:', e); }
+
+      /* Tenta Web Share API com arquivo (Gov.br priority path) */
+      if (fileBlob && navigator.canShare) {
+        const file = new File([fileBlob], fileName, { type: mimeType });
+        if (navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              files : [file],
+              title : _WA.docTitle || 'Documento DocForm',
+              text  : msg,
+            });
+            _waShowSuccess('Documento PDF compartilhado — pronto para assinatura Gov.br / ICP-Brasil.');
+            return;
+          } catch (e) {
+            if (e.name === 'AbortError') {
+              btn.classList.remove('loading');
+              btn.disabled = false;
+              return;
+            }
+            /* Outro erro → fallback link */
           }
-          /* Outro erro → fallback para wa.me */
         }
       }
-    }
 
-    /* Fallback: wa.me link */
-    const url = `https://wa.me/${full}?text=${encodeURIComponent(msg)}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
-    _waShowSuccess(
-      navigator.share
-        ? 'O WhatsApp foi aberto com a mensagem. Confirme o envio no app.'
-        : 'O WhatsApp Web foi aberto em nova aba. Confirme o envio.'
-    );
+      /* Fallback PDF → wa.me com mensagem */
+      const url = `https://wa.me/${full}?text=${encodeURIComponent(msg)}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+      _waShowSuccess(
+        'WhatsApp aberto. Salve o PDF pelo botão ⬇ PDF e anexe manualmente se necessário.'
+      );
+
+    } else {
+      /* ── DOCX: tenta capturar blob via docx.js ── */
+      try { fileBlob = await _waGetDocxBlob(_WA.docType); }
+      catch (e) { console.warn('[DocForm WA] Blob DOCX falhou:', e); }
+
+      /* Web Share com DOCX (Android suporta; iOS geralmente não) */
+      if (fileBlob && navigator.canShare) {
+        const file = new File([fileBlob], fileName, { type: mimeType });
+        if (navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              files : [file],
+              title : _WA.docTitle || 'Documento DocForm',
+              text  : msg,
+            });
+            _waShowSuccess('Documento DOCX compartilhado com sucesso.');
+            return;
+          } catch (e) {
+            if (e.name === 'AbortError') {
+              btn.classList.remove('loading');
+              btn.disabled = false;
+              return;
+            }
+          }
+        }
+      }
+
+      /* Fallback DOCX → abre WhatsApp com mensagem + instrução */
+      const msgDocx = msg + '\n\n📎 [Arquivo DOCX — baixe pelo botão ⬇ DOCX e anexe aqui]';
+      const url = `https://wa.me/${full}?text=${encodeURIComponent(msgDocx)}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+      _waShowSuccess(
+        'WhatsApp aberto com mensagem. Baixe o DOCX pelo botão ⬇ DOCX e anexe na conversa.'
+      );
+    }
 
   } catch (err) {
     console.error('[DocForm WA] Erro ao enviar:', err);
@@ -518,7 +620,53 @@ async function waDoSend() {
   }
 }
 
-/* ── 13. GET PDF BLOB ────────────────────────────────────────── */
+/* ── 14. GET DOCX BLOB ───────────────────────────────────────── */
+/**
+ * Tenta capturar o blob DOCX do documento atual.
+ * Intercepta o FileSaver.saveAs temporariamente para capturar o blob
+ * sem acionar o download do browser.
+ * Retorna um Blob ou null.
+ */
+async function _waGetDocxBlob(tipo) {
+  if (typeof exportarDOCX !== 'function') return null;
+
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      /* Restaura saveAs caso o timeout dispare */
+      if (window._waSaveAsOrig) {
+        window.saveAs = window._waSaveAsOrig;
+        delete window._waSaveAsOrig;
+      }
+      resolve(null);
+    }, 10000);
+
+    try {
+      /* Intercepta FileSaver.saveAs para capturar o blob */
+      const origSaveAs = window.saveAs;
+      window._waSaveAsOrig = origSaveAs;
+
+      window.saveAs = function(blob, name) {
+        window.saveAs = origSaveAs;
+        delete window._waSaveAsOrig;
+        clearTimeout(timer);
+        resolve(blob instanceof Blob ? blob : null);
+      };
+
+      /* Aciona a exportação existente em modo silencioso */
+      exportarDOCX(tipo, true);
+
+    } catch(e) {
+      clearTimeout(timer);
+      if (window._waSaveAsOrig) {
+        window.saveAs = window._waSaveAsOrig;
+        delete window._waSaveAsOrig;
+      }
+      resolve(null);
+    }
+  });
+}
+
+/* ── 15. GET PDF BLOB ────────────────────────────────────────── */
 /**
  * Tenta capturar ou gerar o PDF do documento atual.
  * Retorna um Blob ou null se não for possível.
@@ -576,7 +724,7 @@ async function _waGetPdfBlob(tipo) {
   });
 }
 
-/* ── 14. SHOW SUCCESS ────────────────────────────────────────── */
+/* ── 16. SHOW SUCCESS ────────────────────────────────────────── */
 function _waShowSuccess(msg) {
   const btn     = document.getElementById('wa-send-btn');
   const body    = document.getElementById('wa-modal-body');
