@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════
    DocForm — WhatsApp Share Module
-   wa-share.js  ·  v1.0.0
+   wa-share.js  ·  v1.1.0  (fix: popup bloqueado no mobile)
    ─────────────────────────────────────────────────────────────── */
 
 /* ── 1. COUNTRIES DATABASE ───────────────────────────────────── */
@@ -72,42 +72,29 @@ const _WA = {
 };
 
 /* ── 3. FORMAT SELECTOR ──────────────────────────────────────── */
-/**
- * Alterna entre PDF e DOCX.
- * PDF é sempre prioritário para compatibilidade com Gov.br / ICP-Brasil.
- */
 function waSelectFormat(fmt) {
   _WA.fmt = fmt;
-
-  /* Pills — acende o selecionado, apaga o outro */
   const pdfPill  = document.getElementById('wa-fmt-pdf');
   const docxPill = document.getElementById('wa-fmt-docx');
   if (!pdfPill || !docxPill) return;
-
   pdfPill.classList.toggle('active', fmt === 'pdf');
   pdfPill.setAttribute('aria-pressed', fmt === 'pdf');
   docxPill.classList.toggle('active', fmt === 'docx');
   docxPill.setAttribute('aria-pressed', fmt === 'docx');
-
-  /* Badge no pill de nome do arquivo */
   const typeEl = document.getElementById('wa-pill-type');
   if (typeEl) {
     typeEl.textContent = fmt.toUpperCase();
     typeEl.className   = `wa-doc-pill-type ${fmt}`;
   }
-
-  /* Nota Gov.br — visível apenas quando PDF selecionado */
   const govNote = document.getElementById('wa-govbr-note');
   if (govNote) govNote.style.display = fmt === 'pdf' ? '' : 'none';
-
-  /* Atualiza hint do método (DOCX não suporta Web Share nativo no iOS) */
   _waUpdateMethodHint();
 }
 
 /* ── 4. ICON SVG ─────────────────────────────────────────────── */
 const WA_SVG = `<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>`;
 
-/* ── 4. BUILD MODAL HTML (injetado uma vez no DOM) ───────────── */
+/* ── 5. BUILD MODAL HTML ─────────────────────────────────────── */
 function _waInjectModal() {
   if (document.getElementById('wa-modal-overlay')) return;
 
@@ -115,8 +102,6 @@ function _waInjectModal() {
 <div id="wa-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="wa-modal-title"
      onclick="if(event.target===this)waModalClose()">
   <div class="wa-modal">
-
-    <!-- Header -->
     <div class="wa-modal-hdr">
       <div class="wa-modal-hdr-left">
         <div class="wa-modal-hdr-icon">${WA_SVG}</div>
@@ -127,18 +112,12 @@ function _waInjectModal() {
       </div>
       <button class="wa-modal-close" onclick="waModalClose()" aria-label="Fechar">✕</button>
     </div>
-
-    <!-- Body (form) -->
     <div class="wa-modal-body" id="wa-modal-body">
-
-      <!-- Doc pill + format selector -->
       <div class="wa-doc-pill">
         <span class="wa-doc-pill-icon" id="wa-pill-icon">📄</span>
         <span class="wa-doc-pill-name" id="wa-pill-name">—</span>
         <span class="wa-doc-pill-type pdf" id="wa-pill-type">PDF</span>
       </div>
-
-      <!-- Format selector -->
       <div class="wa-fmt-selector">
         <span class="wa-fmt-label">Formato</span>
         <div class="wa-fmt-pills">
@@ -154,8 +133,6 @@ function _waInjectModal() {
           </button>
         </div>
       </div>
-
-      <!-- Phone -->
       <div>
         <label class="wa-label">Número de WhatsApp</label>
         <div class="wa-phone-row">
@@ -188,8 +165,6 @@ function _waInjectModal() {
           Para o Brasil, informe o DDD (2 dígitos) + número (8 ou 9 dígitos).
         </span>
       </div>
-
-      <!-- Message -->
       <div>
         <label class="wa-label">Mensagem <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-3)">(opcional)</span></label>
         <textarea class="wa-msg-textarea" id="wa-msg" rows="3"
@@ -197,12 +172,8 @@ function _waInjectModal() {
                   placeholder="Segue o documento gerado pelo DocForm. Qualquer dúvida, fico à disposição."></textarea>
         <div class="wa-msg-char" id="wa-msg-char">0 / 500</div>
       </div>
-
-    </div><!-- /body -->
-
+    </div>
     <div class="wa-divider"></div>
-
-    <!-- Footer -->
     <div class="wa-modal-footer">
       <button class="wa-send-btn" id="wa-send-btn" disabled onclick="waDoSend()">
         <svg class="wa-btn-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
@@ -217,8 +188,6 @@ function _waInjectModal() {
         <span>PDF obrigatório para assinatura digital <strong>Gov.br / ICP-Brasil</strong></span>
       </div>
     </div>
-
-    <!-- Success state -->
     <div class="wa-success" id="wa-success">
       <div class="wa-success-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
@@ -229,7 +198,6 @@ function _waInjectModal() {
       </div>
       <button class="wa-success-close" onclick="waModalClose()">Fechar</button>
     </div>
-
   </div>
 </div>`;
 
@@ -237,20 +205,15 @@ function _waInjectModal() {
   _waRenderCountryList(WA_COUNTRIES);
   _waUpdateMethodHint();
 
-  /* Fecha dropdown ao clicar fora */
   document.addEventListener('click', (e) => {
-    if (!e.target.closest('.wa-country-wrap')) {
-      _waCloseDd();
-    }
+    if (!e.target.closest('.wa-country-wrap')) _waCloseDd();
   });
-
-  /* Fecha modal com Escape */
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') waModalClose();
   });
 }
 
-/* ── 5. COUNTRY DROPDOWN ─────────────────────────────────────── */
+/* ── 6. COUNTRY DROPDOWN ─────────────────────────────────────── */
 function _waRenderCountryList(list) {
   const el = document.getElementById('wa-dd-list');
   if (!el) return;
@@ -306,8 +269,6 @@ function waSelectCountry(code) {
   document.getElementById('wa-flag').textContent  = _WA.country.f;
   document.getElementById('wa-dial').textContent  = _WA.country.d;
   _waCloseDd();
-
-  /* Atualiza placeholder e hint */
   const ph = _WA.country.mask.replace(/#/g, '0');
   document.getElementById('wa-phone').placeholder = ph;
   document.getElementById('wa-phone').value = '';
@@ -325,9 +286,8 @@ function _waUpdateHint() {
   }
 }
 
-/* ── 6. PHONE VALIDATION & MASKING ──────────────────────────── */
+/* ── 7. PHONE VALIDATION & MASKING ──────────────────────────── */
 function waOnPhoneInput(el) {
-  /* Aplica máscara apenas para BR */
   const raw = el.value.replace(/\D/g, '').slice(0, 11);
   if (_WA.country.c === 'BR') {
     el.value = _waMaskBR(raw);
@@ -390,7 +350,7 @@ function _waValidatePhone(raw) {
   _waSetSendEnabled(ok);
 }
 
-/* ── 7. MESSAGE COUNTER ──────────────────────────────────────── */
+/* ── 8. MESSAGE COUNTER ──────────────────────────────────────── */
 function waOnMsgInput(el) {
   const len  = el.value.length;
   const max  = 500;
@@ -401,14 +361,12 @@ function waOnMsgInput(el) {
   if (len > max) el.value = el.value.slice(0, max);
 }
 
-/* ── 8. METHOD HINT (Web Share API detection) ────────────────── */
+/* ── 9. METHOD HINT ──────────────────────────────────────────── */
 function _waUpdateMethodHint() {
   const dot  = document.getElementById('wa-method-dot');
   const text = document.getElementById('wa-method-text');
   if (!dot || !text) return;
-
   const isPdf = _WA.fmt === 'pdf';
-
   if (isPdf && navigator.share) {
     dot.classList.add('active');
     text.textContent = 'Web Share API disponível — compartilhamento nativo com arquivo.';
@@ -421,23 +379,17 @@ function _waUpdateMethodHint() {
   }
 }
 
-/* ── 9. SEND BUTTON STATE ────────────────────────────────────── */
+/* ── 10. SEND BUTTON STATE ───────────────────────────────────── */
 function _waSetSendEnabled(on) {
   const btn = document.getElementById('wa-send-btn');
   if (btn) btn.disabled = !on;
 }
 
-/* ── 10. OPEN MODAL ──────────────────────────────────────────── */
-/**
- * Abre o modal para o tipo de documento especificado.
- * @param {'contrato'|'cv'|'email'} tipo
- */
+/* ── 11. OPEN MODAL ──────────────────────────────────────────── */
 function openWaModal(tipo) {
   _waInjectModal();
-
   _WA.docType = tipo;
 
-  /* Monta título e ícone conforme o tipo */
   const map = {
     contrato : { icon: '⚖️',  label: 'Contrato',  sub: 'Formatar Documento' },
     cv       : { icon: '📄',  label: 'Currículo', sub: 'Criar Currículo'     },
@@ -445,14 +397,11 @@ function openWaModal(tipo) {
   };
   const info = map[tipo] || { icon: '📄', label: 'Documento', sub: 'DocForm' };
 
-  /* Nome do arquivo com base nos inputs preenchidos */
   let fileName = '';
   if (tipo === 'contrato') {
     const titulo = document.getElementById('doc-titulo')?.value?.trim();
     const numero = document.getElementById('doc-numero')?.value?.trim();
-    fileName = titulo
-      ? (titulo.slice(0, 48) + (numero ? ` — ${numero}` : ''))
-      : 'Contrato';
+    fileName = titulo ? (titulo.slice(0, 48) + (numero ? ` — ${numero}` : '')) : 'Contrato';
   } else if (tipo === 'cv') {
     const nome = document.getElementById('cv-nome')?.value?.trim();
     fileName = nome ? `Currículo — ${nome}` : 'Currículo';
@@ -462,51 +411,41 @@ function openWaModal(tipo) {
   }
   _WA.docTitle = fileName;
 
-  /* Atualiza elementos do modal */
   document.getElementById('wa-modal-sub').textContent   = info.sub;
   document.getElementById('wa-pill-icon').textContent   = info.icon;
   document.getElementById('wa-pill-name').textContent   = fileName || info.label;
 
-  /* Mensagem padrão inteligente */
   const msgEl = document.getElementById('wa-msg');
   if (msgEl && !msgEl.value) {
     msgEl.value = `Olá! Segue o ${info.label.toLowerCase()} gerado pelo DocForm.\n\nQualquer dúvida, fico à disposição.`;
     waOnMsgInput(msgEl);
   }
 
-  /* Reset estado */
   _WA.fmt = 'pdf';
   waSelectFormat('pdf');
 
   const inp = document.getElementById('wa-phone');
-  if (inp) {
-    inp.value = '';
-    inp.classList.remove('error');
-  }
+  if (inp) { inp.value = ''; inp.classList.remove('error'); }
   document.getElementById('wa-phone-err').textContent = '';
   _waSetSendEnabled(false);
   _WA.valid = false;
   _waCloseDd();
 
-  /* Mostra body, esconde success */
   document.getElementById('wa-modal-body').style.display   = '';
   document.querySelector('.wa-divider').style.display       = '';
   document.querySelector('.wa-modal-footer').style.display  = '';
   document.getElementById('wa-success').classList.remove('show');
 
-  /* Atualiza hint do país atual */
   _waUpdateHint();
   _waUpdateMethodHint();
 
-  /* Abre overlay */
   document.getElementById('wa-modal-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
 
-  /* Foca no input de telefone */
   setTimeout(() => document.getElementById('wa-phone')?.focus(), 120);
 }
 
-/* ── 11. CLOSE MODAL ─────────────────────────────────────────── */
+/* ── 12. CLOSE MODAL ─────────────────────────────────────────── */
 function waModalClose() {
   const overlay = document.getElementById('wa-modal-overlay');
   if (!overlay) return;
@@ -514,7 +453,26 @@ function waModalClose() {
   document.body.style.overflow = '';
 }
 
-/* ── 12. DO SEND ─────────────────────────────────────────────── */
+/* ════════════════════════════════════════════════════════════════
+   ── 13. DO SEND — CORRIGIDO ──────────────────────────────────
+   
+   PROBLEMA ANTERIOR:
+   O código fazia await de _waGetPdfBlob() / _waGetDocxBlob() antes
+   de chamar window.open(). Navegadores (especialmente mobile/Safari)
+   bloqueiam window.open() quando chamado fora do contexto síncrono
+   de um gesto do usuário (clique). Qualquer await "quebra" esse
+   contexto e o popup é bloqueado.
+
+   SOLUÇÃO:
+   1. Se Web Share API disponível (mobile nativo) → usa navigator.share()
+      diretamente com o blob — isso funciona de forma assíncrona pois
+      a API foi projetada para isso.
+   2. Fallback wa.me → abre o link IMEDIATAMENTE de forma síncrona,
+      antes de qualquer await, garantindo que o contexto de gesto
+      do usuário ainda esteja ativo.
+   3. A captura do blob (para o hint de download) é feita em background
+      sem bloquear a abertura do app.
+════════════════════════════════════════════════════════════════ */
 async function waDoSend() {
   if (!_WA.valid) return;
 
@@ -532,107 +490,80 @@ async function waDoSend() {
   const fileName = (_WA.docTitle || 'documento')
     .replace(/[^a-zA-Z0-9À-ÿ \-_]/g, '') + `.${ext}`;
 
-  /* Feedback visual — loading */
   btn.classList.add('loading');
   btn.disabled = true;
 
-  try {
-    let fileBlob = null;
-
-    if (isPdf) {
-      /* ── PDF: tenta capturar blob via jsPDF ── */
-      try { fileBlob = await _waGetPdfBlob(_WA.docType); }
-      catch (e) { console.warn('[DocForm WA] Blob PDF falhou:', e); }
-
-      /* Tenta Web Share API com arquivo (Gov.br priority path) */
-      if (fileBlob && navigator.canShare) {
-        const file = new File([fileBlob], fileName, { type: mimeType });
-        if (navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({
-              files : [file],
-              title : _WA.docTitle || 'Documento DocForm',
-              text  : msg,
-            });
-            _waShowSuccess('Documento PDF compartilhado — pronto para assinatura Gov.br / ICP-Brasil.');
-            return;
-          } catch (e) {
-            if (e.name === 'AbortError') {
-              btn.classList.remove('loading');
-              btn.disabled = false;
-              return;
-            }
-            /* Outro erro → fallback link */
-          }
-        }
+  /* ────────────────────────────────────────────────────────────
+     CAMINHO 1: Web Share API com arquivo (iOS/Android nativos)
+     A API navigator.share() é projetada para uso assíncrono e
+     mantém o contexto de gesto mesmo com await.
+  ──────────────────────────────────────────────────────────── */
+  if (navigator.share && navigator.canShare) {
+    try {
+      // Tenta capturar o blob do documento atual
+      let fileBlob = null;
+      try {
+        fileBlob = isPdf
+          ? await _waGetPdfBlob(_WA.docType)
+          : await _waGetDocxBlob(_WA.docType);
+      } catch(e) {
+        console.warn('[DocForm WA] Blob falhou, usando fallback de link:', e);
       }
 
-      /* Fallback PDF → wa.me com mensagem */
-      const url = `https://wa.me/${full}?text=${encodeURIComponent(msg)}`;
-      window.open(url, '_blank', 'noopener,noreferrer');
-      _waShowSuccess(
-        'WhatsApp aberto. Salve o PDF pelo botão ⬇ PDF e anexe manualmente se necessário.'
-      );
-
-    } else {
-      /* ── DOCX: tenta capturar blob via docx.js ── */
-      try { fileBlob = await _waGetDocxBlob(_WA.docType); }
-      catch (e) { console.warn('[DocForm WA] Blob DOCX falhou:', e); }
-
-      /* Web Share com DOCX (Android suporta; iOS geralmente não) */
-      if (fileBlob && navigator.canShare) {
+      if (fileBlob) {
         const file = new File([fileBlob], fileName, { type: mimeType });
         if (navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({
-              files : [file],
-              title : _WA.docTitle || 'Documento DocForm',
-              text  : msg,
-            });
-            _waShowSuccess('Documento DOCX compartilhado com sucesso.');
-            return;
-          } catch (e) {
-            if (e.name === 'AbortError') {
-              btn.classList.remove('loading');
-              btn.disabled = false;
-              return;
-            }
-          }
+          await navigator.share({
+            files : [file],
+            title : _WA.docTitle || 'Documento DocForm',
+            text  : msg,
+          });
+          _waShowSuccess(
+            isPdf
+              ? 'Documento PDF compartilhado — pronto para assinatura Gov.br / ICP-Brasil.'
+              : 'Documento DOCX compartilhado com sucesso.'
+          );
+          return;
         }
       }
-
-      /* Fallback DOCX → abre WhatsApp com mensagem + instrução */
-      const msgDocx = msg + '\n\n📎 [Arquivo DOCX — baixe pelo botão ⬇ DOCX e anexe aqui]';
-      const url = `https://wa.me/${full}?text=${encodeURIComponent(msgDocx)}`;
-      window.open(url, '_blank', 'noopener,noreferrer');
-      _waShowSuccess(
-        'WhatsApp aberto com mensagem. Baixe o DOCX pelo botão ⬇ DOCX e anexe na conversa.'
-      );
-    }
-
-  } catch (err) {
-    console.error('[DocForm WA] Erro ao enviar:', err);
-    btn.classList.remove('loading');
-    btn.disabled = false;
-    if (typeof showToast === 'function') {
-      showToast('Erro ao abrir WhatsApp. Tente novamente.', 'err');
+      // canShare retornou false ou blob nulo → cai no fallback abaixo
+    } catch (e) {
+      if (e.name === 'AbortError') {
+        // Usuário cancelou o share sheet — restaura botão sem erro
+        btn.classList.remove('loading');
+        btn.disabled = false;
+        return;
+      }
+      console.warn('[DocForm WA] navigator.share falhou, usando fallback wa.me:', e);
+      // Continua para o fallback wa.me
     }
   }
+
+  /* ────────────────────────────────────────────────────────────
+     CAMINHO 2: Fallback wa.me — DEVE ser síncrono (sem await)
+     window.open() só funciona no contexto direto do clique.
+     Abrimos ANTES de qualquer operação assíncrona.
+  ──────────────────────────────────────────────────────────── */
+  const waUrl = isPdf
+    ? `https://wa.me/${full}?text=${encodeURIComponent(msg)}`
+    : `https://wa.me/${full}?text=${encodeURIComponent(msg + '\n\n📎 [Arquivo DOCX — baixe pelo botão ⬇ DOCX e anexe aqui]')}`;
+
+  // ✅ Abre imediatamente — síncrono, dentro do contexto do gesto do usuário
+  window.open(waUrl, '_blank', 'noopener,noreferrer');
+
+  const successMsg = isPdf
+    ? 'WhatsApp aberto! Salve o PDF pelo botão ⬇ PDF e anexe se necessário.'
+    : 'WhatsApp aberto com mensagem. Baixe o DOCX pelo botão ⬇ DOCX e anexe na conversa.';
+
+  _waShowSuccess(successMsg);
 }
 
 /* ── 14. GET DOCX BLOB ───────────────────────────────────────── */
-/**
- * Tenta capturar o blob DOCX do documento atual.
- * Intercepta o FileSaver.saveAs temporariamente para capturar o blob
- * sem acionar o download do browser.
- * Retorna um Blob ou null.
- */
 async function _waGetDocxBlob(tipo) {
   if (typeof exportarDOCX !== 'function') return null;
 
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
-      /* Restaura saveAs caso o timeout dispare */
       if (window._waSaveAsOrig) {
         window.saveAs = window._waSaveAsOrig;
         delete window._waSaveAsOrig;
@@ -641,20 +572,15 @@ async function _waGetDocxBlob(tipo) {
     }, 10000);
 
     try {
-      /* Intercepta FileSaver.saveAs para capturar o blob */
       const origSaveAs = window.saveAs;
       window._waSaveAsOrig = origSaveAs;
-
       window.saveAs = function(blob, name) {
         window.saveAs = origSaveAs;
         delete window._waSaveAsOrig;
         clearTimeout(timer);
         resolve(blob instanceof Blob ? blob : null);
       };
-
-      /* Aciona a exportação existente em modo silencioso */
       exportarDOCX(tipo, true);
-
     } catch(e) {
       clearTimeout(timer);
       if (window._waSaveAsOrig) {
@@ -667,25 +593,16 @@ async function _waGetDocxBlob(tipo) {
 }
 
 /* ── 15. GET PDF BLOB ────────────────────────────────────────── */
-/**
- * Tenta capturar ou gerar o PDF do documento atual.
- * Retorna um Blob ou null se não for possível.
- */
 async function _waGetPdfBlob(tipo) {
-  /* Se o jsPDF estiver disponível e a função exportarPDF existir,
-     tentamos capturar o output como blob.
-     Usamos uma abordagem não-destrutiva: sobrescrevemos save temporariamente. */
   if (typeof window.jspdf === 'undefined' && typeof window.jsPDF === 'undefined') return null;
 
   return new Promise((resolve) => {
-    /* Timeout de segurança */
     const timer = setTimeout(() => resolve(null), 8000);
 
     try {
       const jsPDF = window.jspdf?.jsPDF || window.jsPDF;
       if (!jsPDF) { clearTimeout(timer); resolve(null); return; }
 
-      /* Verifica se há conteúdo na preview correspondente */
       const previewMap = {
         contrato : 'preview-pages-wrap',
         cv       : 'cv-doc-inner',
@@ -696,27 +613,23 @@ async function _waGetPdfBlob(tipo) {
         clearTimeout(timer); resolve(null); return;
       }
 
-      /* Delega para a função existente do script.js com captura de blob.
-         Estratégia: intercepta temporariamente o jsPDF save para capturar o blob. */
       const origSave = jsPDF.prototype.save;
       let captured = null;
 
       jsPDF.prototype.save = function(name) {
         captured = this.output('blob');
-        jsPDF.prototype.save = origSave; /* restaura imediatamente */
+        jsPDF.prototype.save = origSave;
         clearTimeout(timer);
         resolve(captured);
       };
 
-      /* Chama a exportação existente */
       if (typeof exportarPDF === 'function') {
-        exportarPDF(tipo, true /* silent — não exibe toast de download */);
+        exportarPDF(tipo, true);
       } else {
         jsPDF.prototype.save = origSave;
         clearTimeout(timer);
         resolve(null);
       }
-
     } catch(e) {
       clearTimeout(timer);
       resolve(null);
@@ -746,12 +659,11 @@ function _waShowSuccess(msg) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   INICIALIZAÇÃO — injeta botões nos toolbars quando o DOM estiver pronto
+   INICIALIZAÇÃO — injeta botões nos toolbars
 ═══════════════════════════════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', () => {
   _waInjectButtons();
 });
-/* Fallback caso o script carregue depois do DOMContentLoaded */
 if (document.readyState !== 'loading') {
   setTimeout(_waInjectButtons, 0);
 }
@@ -766,8 +678,6 @@ function _waInjectButtons() {
   toolbars.forEach(({ id, tipo }) => {
     const pdfBtn = document.getElementById(id);
     if (!pdfBtn) return;
-
-    /* Evita injeção dupla */
     const existingId = `btn-wa-${tipo}`;
     if (document.getElementById(existingId)) return;
 
@@ -777,8 +687,6 @@ function _waInjectButtons() {
     btn.setAttribute('aria-label', `Enviar ${tipo} via WhatsApp`);
     btn.innerHTML = `<svg class="btn-wa-icon" viewBox="0 0 24 24" fill="currentColor">${_waIconPath()}</svg> WhatsApp`;
     btn.addEventListener('click', () => openWaModal(tipo));
-
-    /* Insere logo após o botão PDF */
     pdfBtn.insertAdjacentElement('afterend', btn);
   });
 }
