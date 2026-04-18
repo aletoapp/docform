@@ -736,31 +736,111 @@ function buildPaginatedHtml(bodyHtml, opts) {
       </div>`;
   }
 
-  // Build single content string, then paginate via off-screen measurement
-  // We use the simplest reliable strategy: render all in one page visually
-  // (the A4 frame shows real margins), and export PDF via jsPDF text/vector.
-  // Margens: Esq 3cm, Dir/Sup/Inf 2cm — padrão OAB/Tribunais
   const footerBase = formatOpts.rodape
     ? `${esc(titulo)}${numero ? ' · Nº ' + esc(numero) : ''}` : '';
 
-  // For preview we just show one scrollable A4-like page per document
-  // The real page breaks happen at PDF export time via jsPDF
-  const totalPages = 1; // visual preview is a single flowing page
+  // ── Área útil de conteúdo por página (px a 96dpi)
+  // A4 = 1123px altura. Margens: topo 75px, fundo 94px, rodapé ~22px
+  const PAGE_H = 1123;
+  const MARGIN_TOP  = 75;
+  const MARGIN_BOT  = formatOpts.rodape ? 116 : 94; // espaço extra p/ rodapé
+  const CONTENT_H   = PAGE_H - MARGIN_TOP - MARGIN_BOT; // ~912px úteis
 
-  let pageHtml = `<div class="doc-page">
-    <div class="doc-page-content">
-      <div class="doc-contract">
-        ${logoHtml}
-        ${docHeader}
-        <div class="doc-body" id="doc-body-editable">${bodyHtml}</div>
-        ${signHtml}
+  // ── Mede o conteúdo completo num container off-screen de largura real
+  const probe = document.createElement('div');
+  probe.style.cssText = [
+    'position:absolute', 'top:-9999px', 'left:-9999px',
+    'width:606px',        // largura útil: 794 - 113(mL) - 75(mR)
+    'font-family:"Times New Roman",Times,serif',
+    'font-size:12pt', 'line-height:1.9', 'visibility:hidden',
+  ].join(';');
+  probe.innerHTML = bodyHtml + signHtml;
+  document.body.appendChild(probe);
+  const totalContentH = probe.scrollHeight;
+  document.body.removeChild(probe);
+
+  // ── Fatia o conteúdo em páginas usando os elementos-filho como unidade
+  // Cada filho (cláusula, parágrafo, seção de assinatura) é medido
+  // individualmente; nunca quebra no meio de um elemento.
+  const probeWrap = document.createElement('div');
+  probeWrap.style.cssText = [
+    'position:absolute', 'top:-9999px', 'left:-9999px',
+    'width:606px',
+    'font-family:"Times New Roman",Times,serif',
+    'font-size:12pt', 'line-height:1.9', 'visibility:hidden',
+  ].join(';');
+  probeWrap.innerHTML = bodyHtml + signHtml;
+  document.body.appendChild(probeWrap);
+
+  const allChildren = Array.from(probeWrap.childNodes).filter(
+    n => n.nodeType === Node.ELEMENT_NODE || (n.nodeType === Node.TEXT_NODE && n.textContent.trim())
+  );
+
+  const pages   = [];   // array de strings HTML, uma por página
+  let   pageContent = '';
+  let   pageUsed    = 0; // px acumulados na página atual
+  let   isFirst     = true;
+
+  // Primeira página tem cabeçalho: mede quanto ele ocupa
+  const headerProbe = document.createElement('div');
+  headerProbe.style.cssText = probeWrap.style.cssText;
+  headerProbe.innerHTML = (logoDataUrl
+    ? `<div class="doc-logo-row right"><img src="${logoDataUrl}" style="max-height:36px;max-width:150px;"></div>` : '')
+    + `<div class="doc-header-block"><div class="doc-title">${esc(titulo)}</div>${numero?`<div class="doc-subtitle">Nº ${esc(numero)}</div>`:''}</div>`;
+  document.body.appendChild(headerProbe);
+  const headerH = headerProbe.scrollHeight;
+  document.body.removeChild(headerProbe);
+
+  pageUsed = headerH;
+
+  for (const child of allChildren) {
+    const el = child.cloneNode(true);
+    const measurer = document.createElement('div');
+    measurer.style.cssText = probeWrap.style.cssText;
+    measurer.appendChild(el);
+    document.body.appendChild(measurer);
+    const childH = measurer.scrollHeight;
+    document.body.removeChild(measurer);
+
+    if (pageUsed + childH > CONTENT_H && pageContent) {
+      // Fecha página atual e abre nova
+      pages.push(pageContent);
+      pageContent = '';
+      pageUsed    = 0;
+      isFirst     = false;
+    }
+
+    pageContent += child.nodeType === Node.ELEMENT_NODE
+      ? child.outerHTML
+      : `<p class="doc-para">${child.textContent}</p>`;
+    pageUsed += childH;
+  }
+  // Última página
+  if (pageContent) pages.push(pageContent);
+
+  document.body.removeChild(probeWrap);
+
+  // ── Monta o HTML final com uma .doc-page por fatia
+  const totalPages = Math.max(pages.length, 1);
+  let result = '';
+
+  pages.forEach((slice, idx) => {
+    const pageNum  = idx + 1;
+    const isFirstP = idx === 0;
+    result += `<div class="doc-page">
+      <div class="doc-page-content">
+        <div class="doc-contract">
+          ${isFirstP ? logoHtml : ''}
+          ${isFirstP ? docHeader : ''}
+          <div class="doc-body"${isFirstP ? ' id="doc-body-editable"' : ''}>${slice}</div>
+        </div>
       </div>
-    </div>
-    ${wmPage(wmPosition)}
-    ${formatOpts.rodape ? `<div class="doc-footer"><span>${footerBase}</span><span>Página 1</span></div>` : ''}
-  </div>`;
+      ${wmPage(wmPosition)}
+      ${formatOpts.rodape ? `<div class="doc-footer"><span>${footerBase}</span><span>Página ${pageNum} de ${totalPages}</span></div>` : ''}
+    </div>`;
+  });
 
-  return pageHtml;
+  return result;
 }
 
 /* ════════════════════════════════════════════
