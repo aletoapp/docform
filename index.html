@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="DocForm">
-
+  
   <link rel="apple-touch-icon" href="https://aletoapp.github.io/docform/assets/img/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="https://aletoapp.github.io/docform/assets/img/icon-512.png">
   <link rel="icon" type="image/png" sizes="32x32" href="https://aletoapp.github.io/docform/assets/img/favicon.png">
@@ -20,7 +20,7 @@
   <meta name="robots" content="index, follow, max-image-preview:large">
   <link rel="canonical" href="https://alexandretorres.com.br/docform/">
 
-  <!--
+  <!-- 
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://docform.app/">
   <meta property="og:site_name" content="DocForm">
@@ -29,27 +29,33 @@
   <meta property="og:image" content="https://aletoapp.github.io/docform/assets/img/og.jpg">
   <meta property="og:image:alt" content="DocForm — Formatação profissional de documentos com IA">
   <meta property="og:locale" content="pt_BR">
-  -->
+--> 
   <!--
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="DocForm — Formatação de Doc Profissional">
   <meta name="twitter:image" content="https://aletoapp.github.io/docform/assets/img/og.jpg">
-  -->
+-->
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <link rel="stylesheet" href="assets/css/wa-share.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+  <script src="assets/js/script.js" defer></script>
+  <script src="assets/js/wa-share.js" defer></script>
+
+</head>
+  
+</head>
 
   <!-- ═══ FONTS ══════════════════════════════════════════════════════ -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 
   <!-- ═══ STYLES ═════════════════════════════════════════════════════ -->
   <link rel="stylesheet" href="styles.css">
-    <!-- ═══ THIRD-PARTY SCRIPTS ═══════════════════════════════════════ -->
+
+  <!-- ═══ THIRD-PARTY SCRIPTS ═══════════════════════════════════════ -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
   <script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
-
-  <!-- ═══ APP SCRIPTS ════════════════════════════════════════════════ -->
-  <script src="script.js" defer></script>
- </head>
+</head>
 <body>
 
 <div class="toast" id="toast"></div>
@@ -58,7 +64,7 @@
 <div id="offline-bar" style="display:none;">
   <span class="offline-dot"></span>
   <span>Modo offline — recursos em cache</span>
-</div>
+</div> 
 
 <!-- PWA Install Banner -->
 <div id="pwa-banner" style="display:none;" role="dialog" aria-label="Instalar DocForm">
@@ -496,5 +502,102 @@
   </div>
 </nav>
 
+<!-- ═══ APP SCRIPT ══════════════════════════════════════════════════ -->
+<script src="script.js"></script>
+
+<!-- ═══ PWA — Service Worker + Install Prompt ══════════════════════ -->
+<script>
+/* ── Service Worker Registration ── */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js', { scope: './' })
+      .then(reg => {
+        console.log('[DocForm SW] Registrado:', reg.scope);
+
+        /* Detecta nova versão disponível */
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              showToast('🔄 Nova versão disponível — recarregue para atualizar', 'ok');
+            }
+          });
+        });
+      })
+      .catch(err => console.warn('[DocForm SW] Erro:', err));
+  });
+}
+
+/* ── Deep-link via ?page= (shortcuts do manifest) ── */
+(function handleShortcut() {
+  const params = new URLSearchParams(window.location.search);
+  const page = params.get('page');
+  if (page && ['formatar','curriculo','email'].includes(page)) {
+    window.addEventListener('DOMContentLoaded', () => navigate(page));
+  }
+})();
+
+/* ── Offline / Online indicator ── */
+function updateOnlineStatus() {
+  const bar = document.getElementById('offline-bar');
+  if (!bar) return;
+  if (!navigator.onLine) {
+    bar.style.display = 'flex';
+  } else {
+    bar.style.display = 'none';
+  }
+}
+window.addEventListener('online',  updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+window.addEventListener('load',    updateOnlineStatus);
+
+/* ── PWA Install Prompt ── */
+let deferredPrompt = null;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+
+  /* Só mostra se o usuário não dismissou antes nesta sessão */
+  if (!sessionStorage.getItem('pwa-dismissed')) {
+    document.getElementById('pwa-banner').style.display = 'flex';
+  }
+});
+
+function pwaInstall() {
+  if (!deferredPrompt) return;
+  document.getElementById('pwa-banner').style.display = 'none';
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(choice => {
+    if (choice.outcome === 'accepted') {
+      showToast('✅ DocForm instalado com sucesso!', 'ok');
+      const badge = document.getElementById('pwa-status-badge');
+      if (badge) { badge.textContent = '📲 App'; }
+    }
+    deferredPrompt = null;
+  });
+}
+
+function pwaDismiss() {
+  document.getElementById('pwa-banner').style.display = 'none';
+  sessionStorage.setItem('pwa-dismissed', '1');
+}
+
+/* Marca no badge quando rodando como PWA standalone */
+window.addEventListener('DOMContentLoaded', () => {
+  if (window.matchMedia('(display-mode: standalone)').matches ||
+      window.navigator.standalone === true) {
+    const badge = document.getElementById('pwa-status-badge');
+    if (badge) { badge.textContent = '📲 App'; badge.title = 'Rodando como app instalado'; }
+  }
+});
+
+window.matchMedia('(display-mode: standalone)').addEventListener('change', e => {
+  const badge = document.getElementById('pwa-status-badge');
+  if (!badge) return;
+  badge.textContent = e.matches ? '📲 App' : 'v 1.0';
+});
+</script>
+  
 </body>
 </html>
