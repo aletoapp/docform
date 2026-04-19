@@ -257,7 +257,9 @@ const AF_PATTERNS = {
     }
   },
 
-  // ③ DATA: regex canônico \d{1,2}\s+de\s+\w+\s+de\s+\d{4} → YYYY-MM-DD; fallback: new Date()
+  // ③ DATA: regex canônico \d{1,2}\s+de\s+\w+\s+de\s+\d{4} → YYYY-MM-DD
+  // Retorna null se não encontrar data no texto — o campo usa o valor
+  // padrão (hoje) definido no DOMContentLoaded, sem sobrescrever silenciosamente.
   data: {
     MESES: { janeiro:1,fevereiro:2,marco:3,abril:4,maio:5,junho:6,julho:7,agosto:8,setembro:9,outubro:10,novembro:11,dezembro:12 },
     extract(text) {
@@ -277,10 +279,8 @@ const AF_PATTERNS = {
           }
         }
       }
-      // Fallback: new Date()
-      const hoje = new Date();
-      const d = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-${String(hoje.getDate()).padStart(2,'0')}`;
-      return { value: d, confidence: 40 };
+      // Nenhuma data encontrada no texto — retorna null, não aplica nada
+      return null;
     }
   },
 
@@ -333,31 +333,33 @@ function normalizarTexto(raw) {
 }
 
 /* ── Aplica um campo no DOM com feedback visual (.auto-filled) ── */
+/* ── Aplica um campo no DOM com feedback visual (.auto-filled)
+   Regra única para todos os campos:
+   - Se vazio → preenche sempre.
+   - Se já tem valor digitado pelo usuário → nunca sobrescreve.
+   - Exceção doc-titulo: permite sobrescrever se o valor atual
+     for um dos títulos padrão de preset (gerado automaticamente),
+     pois o usuário não o digitou manualmente. ── */
 function _applyField(id, value, confidence, label) {
   const el = document.getElementById(id);
   if (!el || !value) return false;
-  // Anti-loop: não sobrescreve campos já preenchidos pelo usuário
+
   const current = el.value.trim();
-  const isPresetDefault = Object.values(PRESET_TITLES).includes(current);
-  if (current && !isPresetDefault && id === 'doc-titulo') return false;
-  if (current && id !== 'doc-titulo') return false;  // só preenche se vazio
+  if (current) {
+    const isPresetDefault = id === 'doc-titulo' &&
+      Object.values(PRESET_TITLES).includes(current);
+    if (!isPresetDefault) return false;
+  }
 
   el.value = value;
-  // ✨ Highlight .auto-filled com animação glowFill
   el.classList.add('auto-filled');
   setTimeout(() => el.classList.remove('auto-filled'), 2000);
   return true;
 }
 
-/* ── Aplica campo de partes (sign1/sign2) — não sobrescreve se preenchido ── */
+/* ── Alias semântico para campos de assinatura — mesma regra ── */
 function _applySignField(id, value) {
-  const el = document.getElementById(id);
-  if (!el || !value) return false;
-  if (el.value.trim()) return false;  // anti-loop: só preenche se vazio
-  el.value = value;
-  el.classList.add('auto-filled');
-  setTimeout(() => el.classList.remove('auto-filled'), 2000);
-  return true;
+  return _applyField(id, value, 0, '');
 }
 
 /* ── Renderiza o painel de feedback do Auto-Fill ── */
@@ -429,14 +431,13 @@ function analisarTextoInteligente(text) {
 
   // ③  Data
   const dResult = AF_PATTERNS.data.extract(normalized);
-  if (dResult) {
+  // Só aplica se encontrou data real no texto (confidence >= threshold).
+  // Se não encontrou, deixa o valor padrão definido no DOMContentLoaded (hoje).
+  if (dResult && dResult.confidence >= AF_THRESHOLD_SUGGEST) {
     const ok = _applyField('doc-data', dResult.value, dResult.confidence, 'Data');
-    if (ok && dResult.confidence >= AF_THRESHOLD_SUGGEST) {
+    if (ok) {
       applied.push('doc-data');
       detected.push({ icon:'📅', label:'Data de Elaboração', value: dResult.value, confidence: dResult.confidence });
-    } else if (ok) {
-      // Fallback silencioso: aplica new Date() sem exibir no painel
-      applied.push('doc-data');
     }
   }
 
@@ -515,6 +516,30 @@ function selectPreset(btn) {
 function updateCount() {
   const n = document.getElementById('input-text').value.length;
   document.getElementById('char-count').textContent = n.toLocaleString('pt-BR') + ' caracteres';
+}
+
+function limparFormulario() {
+  // 1. Limpa o textarea e atualiza contador
+  document.getElementById('input-text').value = '';
+  updateCount();
+
+  // 2. Limpa todos os campos preenchidos pelo auto-fill
+  ['doc-titulo','doc-numero','doc-cidade','doc-data','sign1-name','sign2-name'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+
+  // 3. Esconde o painel de detecção/auto-fill
+  const banner = document.getElementById('detect-banner-wrap');
+  if (banner) banner.style.display = 'none';
+
+  // 4. Remove seleção de preset e volta ao genérico
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('selected'));
+  currentPreset = 'generico';
+
+  // 5. Esconde o preview se estiver visível
+  const preview = document.getElementById('preview-section');
+  if (preview) preview.style.display = 'none';
 }
 
 /* ════════════════════════════════════════════
@@ -973,7 +998,7 @@ async function exportContratoPDF() {
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pW = 210, pH = 297;
   // Margens: Esq 3cm (encadernação), Sup 2cm, Dir 2,5cm, Inf 2,5cm — praxe contratual
-  const mL = 30, mR = 25, mT = 20, mB = 25; // mR: 25mm — praxe contratual (ABNT inferior = 2,5cm)
+  const mL = 30, mR = 25, mT = 20, mB = 25; // mL:3cm (encadernação) · mR/mT:2,5cm/2cm · mB:2,5cm — padrão OAB/Tribunais
   const cW = pW - mL - mR; // 160mm content width
 
   const titulo  = document.getElementById('doc-titulo').value || PRESET_TITLES[currentPreset] || 'CONTRATO';
@@ -1412,7 +1437,7 @@ async function exportEmailPDF() {
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pW = 210, pH = 297;
-  const mL = 30, mR = 25, mT = 20, mB = 25; // mR: 25mm — praxe contratual (ABNT inferior = 2,5cm)
+  const mL = 30, mR = 25, mT = 20, mB = 25; // mL:3cm (encadernação) · mR/mT:2,5cm/2cm · mB:2,5cm — padrão OAB/Tribunais
   const cW = pW - mL - mR;
   let y = mT;
 
@@ -1679,25 +1704,39 @@ function gerarCV() {
    EMAIL PREVIEW
 ════════════════════════════════════════════ */
 function formatarEmail() {
-  const corpo = document.getElementById('em-corpo').value.trim();
+  const corpo   = document.getElementById('em-corpo').value.trim();
   if (!corpo) { showToast('Cole o corpo do e-mail.', 'err'); return; }
-  const de    = document.getElementById('em-de').value;
-  const para  = document.getElementById('em-para').value;
-  const assunto = document.getElementById('em-assunto').value;
-  const local = document.getElementById('em-local').value || hojeFormatado();
-  const assin = document.getElementById('em-assinatura').value;
-  const paras = corpo.split('\n').filter(l => l.trim()).map(l => `<p style="margin-bottom:8pt;">${esc(l.trim())}</p>`).join('');
-  const logoEl = logoDataUrl ? `<img src="${logoDataUrl}" style="max-height:32px;max-width:130px;float:right;object-fit:contain;">` : '';
+  const de      = document.getElementById('em-de').value.trim();
+  const para    = document.getElementById('em-para').value.trim();
+  const assunto = document.getElementById('em-assunto').value.trim();
+  const local   = document.getElementById('em-local').value.trim() || hojeFormatado();
+  const assin   = document.getElementById('em-assinatura').value.trim();
+
+  // Cada linha do corpo é escapada individualmente antes de ir para innerHTML
+  const paras = corpo.split('\n')
+    .filter(l => l.trim())
+    .map(l => `<p style="margin-bottom:8pt;">${esc(l.trim())}</p>`)
+    .join('');
+
+  // Assinatura: split por vírgula ANTES de escapar cada parte
+  const assinHtml = assin
+    ? assin.split(',').map(s => esc(s.trim())).filter(Boolean).join('<br>')
+    : '';
+
+  const logoEl = logoDataUrl
+    ? `<img src="${logoDataUrl}" style="max-height:32px;max-width:130px;float:right;object-fit:contain;">`
+    : '';
+
   document.getElementById('email-preview').innerHTML = `
     <div style="border-bottom:2.5px solid #1a3a5c;padding-bottom:7mm;margin-bottom:6mm;overflow:hidden;">
       ${logoEl}
-      <div style="font-size:15pt;font-weight:700;color:#1a3a5c;font-family:'Times New Roman',serif;line-height:1.2;">${esc(assunto||'E-mail Corporativo')}</div>
-      ${de   ? `<div style="font-size:9pt;color:#555;margin-top:4pt;"><strong>De:</strong> ${esc(de)}</div>` : ''}
-      ${para ? `<div style="font-size:9pt;color:#555;"><strong>Para:</strong> ${esc(para)}</div>` : ''}
+      <div style="font-size:15pt;font-weight:700;color:#1a3a5c;font-family:'Times New Roman',serif;line-height:1.2;">${esc(assunto || 'E-mail Corporativo')}</div>
+      ${de   ? `<div style="font-size:9pt;color:#555;margin-top:4pt;"><strong>De:</strong> ${esc(de)}</div>`   : ''}
+      ${para ? `<div style="font-size:9pt;color:#555;"><strong>Para:</strong> ${esc(para)}</div>`              : ''}
       <div style="font-size:9pt;color:#555;"><strong>Data:</strong> ${esc(local)}</div>
     </div>
     <div style="font-size:11pt;color:#1a1a1a;line-height:1.75;">${paras}</div>
-    ${assin ? `<div style="margin-top:9mm;padding-top:4mm;border-top:1px solid #ccc;font-size:9.5pt;color:#444;">${esc(assin).replace(/,/g,'<br>')}</div>` : ''}
+    ${assinHtml ? `<div style="margin-top:9mm;padding-top:4mm;border-top:1px solid #ccc;font-size:9.5pt;color:#444;">${assinHtml}</div>` : ''}
   `;
   document.getElementById('email-preview-section').style.display = 'block';
   scaleDocPreview('email-preview');
