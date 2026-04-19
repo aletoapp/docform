@@ -136,9 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('input-text').addEventListener('input', () => {
     updateCount();
     clearTimeout(window._detectTimer);
-    window._detectTimer = setTimeout(() => {
-      analisarTextoInteligente(document.getElementById('input-text').value);
-    }, 600);
+    window._detectTimer = setTimeout(runAutoDetect, 600);
   });
   // Paste → análise imediata após o browser inserir o texto
   document.getElementById('input-text').addEventListener('paste', () => {
@@ -490,6 +488,18 @@ function analisarTextoInteligente(text) {
   }
 }
 
+/* ── Compatibilidade: runAutoDetect chama a nova engine ── */
+function runAutoDetect() {
+  const text = document.getElementById('input-text').value;
+  analisarTextoInteligente(text);
+}
+
+function applyDetected(preset, title) {
+  const btn = document.querySelector(`[data-preset="${preset}"]`);
+  if (btn) selectPreset(btn);
+  showToast(`Tipo aplicado: ${title}`, 'ok');
+  document.getElementById('detect-banner-wrap').style.display = 'none';
+}
 
 /* ════════════════════════════════════════════
    PRESET
@@ -513,26 +523,23 @@ function limparFormulario() {
   document.getElementById('input-text').value = '';
   updateCount();
 
-  // 2. Limpa campos preenchidos pelo auto-fill
+  // 2. Limpa todos os campos preenchidos pelo auto-fill
   ['doc-titulo','doc-numero','doc-cidade','doc-data','sign1-name','sign2-name'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
 
-  // 3. Esconde painel de detecção/auto-fill
+  // 3. Esconde o painel de detecção/auto-fill
   const banner = document.getElementById('detect-banner-wrap');
   if (banner) banner.style.display = 'none';
 
-  // 4. Remove seleção de preset, volta ao genérico
+  // 4. Remove seleção de preset e volta ao genérico
   document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('selected'));
   currentPreset = 'generico';
 
-  // 5. Esconde preview (usa classe .preview-section-hidden)
+  // 5. Esconde o preview se estiver visível
   const preview = document.getElementById('preview-section');
-  if (preview) {
-    preview.classList.add('preview-section-hidden');
-    preview.style.display = '';
-  }
+  if (preview) preview.style.display = 'none';
 }
 
 /* ════════════════════════════════════════════
@@ -886,14 +893,12 @@ function formatarDocumento() {
   wrap.innerHTML = pageHtml;
   scaleDocPreview('preview-pages-wrap');
 
-  const previewSection = document.getElementById('preview-section');
-  previewSection.classList.remove('preview-section-hidden');
-  previewSection.style.display = '';
+  document.getElementById('preview-section').style.display = 'block';
   document.getElementById('preview-info').textContent =
     `${clauseCount} cláusula${clauseCount !== 1 ? 's' : ''} · ${texto.length.toLocaleString('pt-BR')} chars` +
     (logoDataUrl ? ' · logotipo' : '') + (wmDataUrl ? ' · marca d\'água' : '');
 
-  previewSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.getElementById('preview-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
   showToast('Documento formatado!', 'ok');
   setTimeout(() => scaleDocPreview('preview-pages-wrap'), 80);
 }
@@ -1688,11 +1693,9 @@ function gerarCV() {
     ${idiomaHtml?`<div class="cv-sec"><div class="cv-sec-title">Idiomas</div>${idiomaHtml}</div>`:''}
     ${extraHtml?`<div class="cv-sec"><div class="cv-sec-title">Informações Adicionais</div>${extraHtml}</div>`:''}
   `;
-  const cvSection = document.getElementById('cv-preview-section');
-  cvSection.classList.remove('preview-section-hidden');
-  cvSection.style.display = '';
+  document.getElementById('cv-preview-section').style.display = 'block';
   scaleDocPreview('cv-preview');
-  cvSection.scrollIntoView({ behavior: 'smooth' });
+  document.getElementById('cv-preview-section').scrollIntoView({ behavior: 'smooth' });
   showToast('Currículo gerado!', 'ok');
   setTimeout(() => { scaleDocPreview("cv-preview"); scaleDocPreview("email-preview"); }, 80);
 }
@@ -1735,11 +1738,9 @@ function formatarEmail() {
     <div style="font-size:11pt;color:#1a1a1a;line-height:1.75;">${paras}</div>
     ${assinHtml ? `<div style="margin-top:9mm;padding-top:4mm;border-top:1px solid #ccc;font-size:9.5pt;color:#444;">${assinHtml}</div>` : ''}
   `;
-  const emailSection = document.getElementById('email-preview-section');
-  emailSection.classList.remove('preview-section-hidden');
-  emailSection.style.display = '';
+  document.getElementById('email-preview-section').style.display = 'block';
   scaleDocPreview('email-preview');
-  emailSection.scrollIntoView({ behavior: 'smooth' });
+  document.getElementById('email-preview-section').scrollIntoView({ behavior: 'smooth' });
   showToast('E-mail formatado!', 'ok');
   setTimeout(() => { scaleDocPreview("cv-preview"); scaleDocPreview("email-preview"); }, 80);
 }
