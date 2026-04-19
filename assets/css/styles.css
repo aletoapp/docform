@@ -58,6 +58,53 @@ header {
 }
 
 
+/* ════════════════════════════════════════════
+   HOME — HERO BUTTONS
+════════════════════════════════════════════ */
+
+.hero-btn-row-1,
+.hero-btn-row-2 {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.hero-btn-row-2 {
+  margin-bottom: 28px;
+}
+
+.hero-btn-row-1 .btn,
+.hero-btn-row-2 .btn {
+  padding: 11px 20px;
+  font-size: 0.86rem;
+  border-radius: var(--radius);
+  text-decoration: none;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* GitHub SVG icon herda a cor do botão */
+.hero-btn-row-1 .btn svg,
+.hero-btn-row-2 .btn svg {
+  flex-shrink: 0;
+  fill: currentColor;
+}
+
+@media (max-width: 480px) {
+  .hero-btn-row-1,
+  .hero-btn-row-2 {
+    flex-direction: column;
+  }
+
+  .hero-btn-row-1 .btn,
+  .hero-btn-row-2 .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
 
 
 .logo {
@@ -241,6 +288,7 @@ header {
 ═══════════════════════════════════════════ */
 .form-grid { display: grid; gap: 12px; }
 .form-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
 .fg { display: flex; flex-direction: column; gap: 5px; }
 .fg label {
   font-family: var(--font-mono);
@@ -325,6 +373,7 @@ select option { background: #1a2028; color: var(--text); }
 }
 .btn-danger:hover { background: rgba(248,81,73,0.07); }
 .btn-full { width: 100%; padding: 13px; font-size: 0.92rem; border-radius: var(--radius-lg); }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
 
 /* ═══════════════════════════════════════════
    TOGGLE CHIPS
@@ -402,6 +451,17 @@ select option { background: #1a2028; color: var(--text); }
   display: flex; align-items: center; gap: 12px;
   margin-top: 10px; animation: fadeUp 0.2s ease;
 }
+.detect-banner-body { flex: 1; }
+.detect-banner-label { font-size: 0.68rem; color: #5fa8f5; font-family: var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; }
+.detect-banner-value { font-size: 0.87rem; color: var(--text); font-weight: 500; margin-top: 1px; }
+.detect-apply {
+  flex-shrink: 0; background: #388bfd; color: #fff;
+  border: none; border-radius: var(--radius);
+  padding: 7px 13px; font-size: 0.77rem;
+  font-family: var(--font-sans); cursor: pointer;
+  transition: background 0.13s; white-space: nowrap;
+}
+.detect-apply:hover { background: #4d9ffe; }
 
 /* ═══════════════════════════════════════════
    TAGS INPUT
@@ -729,12 +789,14 @@ select option { background: #1a2028; color: var(--text); }
   .sidebar { display: none !important; }
   .bottom-nav { display: flex !important; }
   .main { margin-left: 0; padding: 16px 14px calc(var(--nav) + var(--safe-b) + 20px); max-width: 100%; }
-  .form-row { grid-template-columns: 1fr; }
+  .form-row, .form-row-3 { grid-template-columns: 1fr; }
   .presets-grid { grid-template-columns: repeat(3, 1fr); }
   .sign-area, .witness-area { flex-direction: column; gap: 16px; }
   .preview-toolbar { flex-direction: column; align-items: flex-start; }
   .pt-actions { width: 100%; }
   .pt-actions .btn { flex: 1; }
+  .btn-row { flex-direction: column; }
+  .btn-row .btn { width: 100%; }
   .cv-head { flex-direction: column; text-align: center; }
   .cv-contacts { justify-content: center; }
   .toast { bottom: calc(var(--nav) + var(--safe-b) + 10px); }
@@ -745,7 +807,7 @@ select option { background: #1a2028; color: var(--text); }
   .feat-grid { grid-template-columns: 1fr; }
 }
 @media print {
-  header, .sidebar, .bottom-nav, .preview-toolbar, .card { display: none !important; }
+  header, .sidebar, .bottom-nav, .preview-toolbar, .btn-row, .card { display: none !important; }
   .main { margin: 0; padding: 0; }
   .doc-frame { box-shadow: none; }
   .doc-page { border: none; }
@@ -914,8 +976,19 @@ select option { background: #1a2028; color: var(--text); }
   text-align: center;
 }
 
+/* Green flash animation for auto-filled fields */
+@keyframes afFieldFlash {
+  0%   { border-color: #3fb950; box-shadow: 0 0 0 3px rgba(63,185,80,0.3); }
+  70%  { border-color: #3fb950; box-shadow: 0 0 0 3px rgba(63,185,80,0.15); }
+  100% { border-color: var(--border); box-shadow: none; }
+}
+.af-field-applied {
+  animation: afFieldFlash 1.8s ease forwards;
+}
+
 /* ════════════════════════════════════════════
    ✨ AUTO-FILL — .auto-filled + glowFill
+   Engenharia de Luxo — UX Feedback Visual
 ════════════════════════════════════════════ */
 @keyframes glowFill {
   0%   { box-shadow: 0 0 0 0 rgba(63,185,80,0); }
@@ -989,40 +1062,7 @@ body.is-offline .layout { padding-top: calc(var(--hdr) + 30px); }
 }
 /* Editable paragraphs show hover highlight */
 .doc-contract[contenteditable="true"] p:hover,
-.doc-contract[contenteditable="true"] .doc-clause-title:hover {
+.doc-contract[contenteditable="true"] .clause-title:hover {
   background: rgba(201,168,76,0.06);
   border-radius: 3px;
 }
-
-/* ════════════════════════════════════════════
-   UTILITY — classes extraídas de inline styles
-════════════════════════════════════════════ */
-
-/* Seções de preview ocultas por padrão */
-.preview-section-hidden { display: none; margin-top: 24px; }
-
-/* Botões de remoção de logo/watermark */
-.btn-rm-asset { display: none; margin-top: 6px; width: 100%; }
-
-/* Página A4 do CV */
-.doc-a4-page {
-  width: 794px;
-  min-height: 1123px;
-  padding: 75px 75px 90px 75px;
-  background: #fff;
-  box-sizing: border-box;
-  margin: 0 auto;
-}
-
-/* Página A4 do e-mail (margem esquerda maior — padrão jurídico) */
-.doc-a4-email {
-  width: 794px;
-  min-height: 600px;
-  padding: 75px 75px 90px 113px;
-  background: #fff;
-  box-sizing: border-box;
-  margin: 0 auto;
-}
-
-/* Botão Limpar — compacto, ao lado do char count */
-.btn-limpar { padding: 5px 11px; font-size: 0.76rem; }
